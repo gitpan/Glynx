@@ -15,7 +15,6 @@
 	<LI><A HREF="#SYNOPSIS">SYNOPSIS</A>
 	<LI><A HREF="#HINTS">HINTS</A>
 	<LI><A HREF="#COMMAND_LINE_OPTIONS">COMMAND-LINE OPTIONS</A>
-	<LI><A HREF="#TO_DO">TO-DO</A>
 	<LI><A HREF="#COPYRIGHT">COPYRIGHT</A>
 </UL>
 <!-- INDEX END -->
@@ -43,11 +42,11 @@ distributed download (see <CODE>--slave</CODE>, <CODE>--stop</CODE>, <CODE>--res
 <P>
 It partially supports: redirect (using file-copy), java, javascript,
 multimedia, authentication (only basic), mirror, translating links to local
-computer (<CODE>--makerel</CODE>), ftp, renaming too long filenames and too deep directories, cookies,
-proxy.
+computer (<CODE>--makerel</CODE>), correcting file extensions, ftp, renaming too long filenames and too
+deep directories, cookies, proxy, forms.
 
 <P>
-It does not support yet: forms
+A very basic cgi user interface is included.
 
 <P>
 No testing so far: ``https:''.
@@ -61,24 +60,24 @@ Tested on Linux and NT
 <DL>
 <DT><STRONG><A NAME="item_Do">Do-everything at once:</A></STRONG><DD>
 <P>
-<PRE> $progname.pl [options] &lt;URL&gt;
+<PRE> glynx.pl [options] &lt;URL&gt;
 </PRE>
 <DT><STRONG><A NAME="item_Save">Save work to finish later:</A></STRONG><DD>
 <P>
-<PRE> $progname.pl [options] --dump=&quot;dump-file&quot; &lt;URL&gt;
+<PRE> glynx.pl [options] --dump=&quot;dump-file&quot; &lt;URL&gt;
 </PRE>
 <DT><STRONG><A NAME="item_Finish">Finish saved download:</A></STRONG><DD>
 <P>
-<PRE> $progname.pl [options] &quot;download-list-file&quot;
+<PRE> glynx.pl [options] &quot;download-list-file&quot;
 </PRE>
 <DT><STRONG><A NAME="item_Network">Network mode (client/slave)</A></STRONG><DD>
 <DT><STRONG><A NAME="item__">- Clients:</A></STRONG><DD>
 <P>
-<PRE> $progname.pl [options] --dump=&quot;dump-file&quot; &lt;URL&gt;
+<PRE> glynx.pl [options] --dump=&quot;dump-file&quot; &lt;URL&gt;
 </PRE>
 <DT><STRONG>- Slaves (will wait until there is something to do):</STRONG><DD>
 <P>
-<PRE> $progname.pl [options] --slave
+<PRE> glynx.pl [options] --slave
 </PRE>
 </DL>
 <P>
@@ -269,15 +268,6 @@ Other options: (to-be better explained)
   --404-retry       will retry on error 404 Not Found. 
   --no404-retry     creates an empty file on error 404 Not Found.
 </PRE>
-<P>
-<HR>
-<H1><A NAME="TO_DO">TO-DO</A></H1>
-<P>
-More command-line compatibility with lwp-rget
-
-<P>
-Graphical user interface
-
 <P>
 <HR>
 <H1><A NAME="COPYRIGHT">COPYRIGHT</A></H1>

@@ -1,0 +1,41 @@
+Glynx - a download manager. 
+
+ACCESSORIES
+
+glynx_httpd.pl
+
+	A stand-alone web-server providing a user interface for glynx.
+	Configuration:
+		$Default_Server_Port -- default is 8081.
+
+glynx.cgi
+
+	Same user interface as glynx_httpd.pl, but it is installable in
+	a web-server.
+	Configuration:
+		none.
+
+glynx_slave.pl
+
+	A shortcut for starting glynx in slave mode.
+	Configuration:
+		$base_dir -- where will glynx look for jobs.
+
+glynx_menu.pl
+
+	Subroutines used by glynx_httpd.pl and glynx.cgi.
+	Provides the user interface.
+	Configuration:
+		$base_dir -- where will glynx look for jobs;
+		$log_dir  -- where we write the log file.
+
+
+COPYRIGHT
+
+Copyright (c) 2000 Flavio Glock <fglock@pucrs.br>. All rights reserved.
+This program is free software; you can redistribute it and/or
+modify it under the same terms as Perl itself.
+This program was based on examples in the Perl distribution.
+
+-----------
+

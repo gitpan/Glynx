@@ -2,6 +2,32 @@ Glynx - a download manager.
 
 Version history:
 
+ 1.026:
+	- simple GET and PUT forms
+	- reject link "c:\"
+	- bigger max-link-len (500 bytes)
+	- slave intervals on SLEEP if it is active; otherwise on TIMEOUT
+	- ftp-dir sends content-location
+	- finds ftp.pm in program's directory
+	- better make-dir
+	- escapes single-quotes reading config-file
+	- corrected: didn't start if had --prefix
+	- resume ftp transfers. Needs the custom ftp.pm module.
+	- base-dir is always absolute
+	- makerel: default is don't make backup
+	- verify each subdirectory for transformations
+	- sites with ports translate back correctly to site:port
+	- make_shorter_name receives untransformed url also
+	- separated pod file
+	- saves Content-Type
+	- can save any file attribute (delimiter is space)
+	- reprocessing the cache is slower, due to relative links reconstruction
+	- might create directories for linked sites, if it is necessary to create reference files
+
+ 1.025:
+	- correction (again...) in slave mode variables save/restore
+	- included simple web front-end in eg directory
+
  1.024:
 	new options:
   	--name-len-max=   Limit filename size

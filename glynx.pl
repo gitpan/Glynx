@@ -2,245 +2,27 @@
 # Copyright (c) 2000 Flavio Glock <fglock@pucrs.br>. All rights reserved.
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl itself.
-#
-# This program was based on examples in the Perl distribution,
-# mainly from Gisle Aas.
 # 
 # If you use it/like it, send a postcard to the author. 
-# Find the latest version in CPAN or http://www.pucrs.br/flavio
+# Find the latest version in CPAN
 
-use Cwd 		qw(abs_path);
+use Cwd		qw(abs_path);
 use Getopt::Long;
 use LWP::UserAgent;
 use HTTP::Cookies;
 use URI::URL;
-use URI::Heuristic 	qw(uf_uristr);
-use LWP::MediaTypes 	qw(media_suffix);
+use URI::Heuristic	qw(uf_uristr);
+use URI::Escape 	qw(uri_escape);
+use LWP::MediaTypes	qw(media_suffix);
 
-my $VERSION = "1.024";
+# our ftp module may be located on program's directory
 
+my $progname = $0;
+my ($prog_dir) = $progname =~ /(.*)[\/\\]/;
+push @INC, $prog_dir;
+require ftp;
 
-=head1 NAME
-
-Glynx - a download manager. 
-
-=head1 DESCRIPTION
-
-Glynx makes a local image of a selected part of the internet.
-
-It can be used to make download lists to be used with other download managers, making
-a distributed download process.
-
-It currently supports resume/retry, referer, user-agent, frames, distributed
-download (see C<--slave>, C<--stop>, C<--restart>).
-
-It partially supports: redirect (using file-copy), java,
-javascript, multimedia, authentication (only basic), 
-mirror, translating links to local computer (C<--makerel>),
-ftp, renaming too long filenames and too deep directories,
-cookies, proxy.
-
-It does not support yet: forms
-
-No testing so far: "https:".
-
-Tested on Linux and NT
-
-=head1 SYNOPSIS
-
-=over
-
-=item Do-everything at once:  
-
- $progname.pl [options] <URL>
-
-
-=item Save work to finish later:   
-
- $progname.pl [options] --dump="dump-file" <URL>
-
-
-=item Finish saved download:  
-
- $progname.pl [options] "download-list-file"
-
-=item Network mode (client/slave)
-
-=item - Clients: 
-
- $progname.pl [options] --dump="dump-file" <URL>
-
-
-=item - Slaves (will wait until there is something to do): 
-
- $progname.pl [options] --slave
-
-=back
-
-=head1 HINTS
-
-How to create a default configuration:
-
-	Start the program with all command-line configurations, plus --cfg-save
-	or:
- 	1 - start the program with --cfg-save
-	2 - edit glynx.ini file
-
---subst, --exclude and --loop use regular expressions.
-
-   http://www.site.com/old.htm --subst=s/old/new/
-   downloads: http://www.acme.com/new.htm
-
-   - Note: the substitution string MUST be made of "valid URL" characters
-
-   --exclude=/\.gif/
-   will not download ".gif" files
-
-   - Note: Multiple --exclude are allowed:
-
-   --exclude=/gif/  --exclude=/jpeg/
-   will not download ".gif" or ".jpeg" files
-
-   It can also be written as:
-   --exclude=/\.gif|\.jp.?g/i
-   matching .gif, .GIF, .jpg, .jpeg, .JPG, .JPEG
-
-   --exclude=/www\.site\.com/
-   will not download links containing the site name
-
-   http://www.site.com/bin/index.htm --prefix=http://www.site.com/bin/
-   won't download outside from directory "/bin". Prefix must end with a slash "/".
-
-   http://www.site.com/index%%%.htm --loop=%%%:0..3
-   will download:
-     http://www.site.com/index0.htm
-     http://www.site.com/index1.htm
-     http://www.site.com/index2.htm
-     http://www.site.com/index3.htm
-
-   - Note: the substitution string MUST be made of "valid URL" characters
-
-- For multiple exclusion: use "|".
-
-- Don't read directory-index:
-
-   	?D=D ?D=A ?S=D ?S=A ?M=D ?M=A ?N=D ?N=A =>  \?[DSMN]=[AD] 
-
-	To change default "exclude" pattern - put it in the configuration file
-
-Note: "File:" item in dump file is ignored
-
-You can filter the processing of a dump file using --prefix, --exclude, --subst
-
-If after finishing downloading you still have ".PART._BUSY_" files in the 
-base directory, rename them to ".PART" (the program should do this by itself)
-
-Don't do this: --depth=1 --out-depth=3 because "out-depth" is an upper limit; it 
-is tested after depth is generated. The right way is: --depth=4 --out-depth=3
-
-This will do nothing:
-
- --dump=x graphic.gif
-
-because the dump file gets all binary files.
-
-Errors using https:
-
- [ ERROR 501 Protocol scheme 'https' is not supported => LATER ] or
- [ ERROR 501 Can't locate object method "new" via package "LWP::Protocol::https" => LATER ]
-
-This means you need to install at least "openssl" (http://www.openssl.org), Net::SSLeay and IO::Socket::SSL
-
-
-=head1 COMMAND-LINE OPTIONS
-
-Check --help for default values.
-
-Very basic:
-
-  --version         Print version number and quit
-  --verbose         More output
-  --quiet           No output
-  --help            Help page
-  --cfg-save        Save configuration to file
-  --base-dir=DIR    Place to load/save files
-
-Download options are:
-
-  --sleep=SECS      Sleep between gets, ie. go slowly
-  --prefix=PREFIX   Limit URLs to those which begin with PREFIX
-                    Multiple "--prefix" are allowed.
-  --depth=N         Maximum depth to traverse
-  --out-depth=N     Maximum depth to traverse outside of PREFIX
-  --referer=URI     Set initial referer header
-  --limit=N         A limit on the number documents to get
-  --retry=N         Maximum number of retrys
-  --timeout=SECS    Timeout value - increases on retrys
-  --agent=AGENT     User agent name
-  --mirror          Checks all existing files for updates
-  --nomirror        Do not check for updates -- if file exists, it's ok
-  --mediaext        Creates a file link, guessing the media type extension (.jpg, .gif)
-                    (perl actually makes a file copy)
-  --nomediaext      Do not try to change media type extension
-  --makerel         Make Relative links. Links in pages will work in the
-                    local computer.
-  --nomakerel       Keep links as they are. Do not try to change links.
-  --auth=USER:PASS  Set authentication credentials
-  --cookies=FILE    Set up a cookies file (default is no cookies)
-  --name-len-max    Limit filename size
-  --dir-depth-max   Limit directory depth
-
-Multi-process control:
-
-  --slave           Wait until a download-list file is created (be a slave)
-  --stop            Stop slave
-  --restart         Stop and restart slave
-
-Not implemented yet but won't generate fatal errors (compatibility with lwp-rget):
-
-  --hier            Download into hierarchy (not all files into cwd)
-  --iis             Workaround IIS 2.0 bug by sending "Accept: */*" MIME
-                    header; translates backslashes (\) to forward slashes (/)
-  --keepext=type    Keep file extension for MIME types (comma-separated list)
-  --nospace         Translate spaces URLs (not #fragments) to underscores (_)
-  --tolower         Translate all URLs to lowercase (useful with IIS servers)
-
-Other options: (to-be better explained)
-
-  --indexfile=FILE  Index file in a directory
-  --part-suffix=.SUFFIX  Extension to use for partial downloads 
-                    (example: ".Getright" ".PART")
-  --dump=FILE       make download-list file, to be used later
-  --dump-max=N      number of links per download-list file 
-  --invalid-char=C  Character to use in substitutions for invalid characters
-  --exclude=/REGEXP/i  Don't download matching URLs
-                    Multiple --exclude are allowed
-  --loop=REGEXP:INITIAL..FINAL  Expand a URL through substitutions 
-                    (example: xx:a,b,c  xx:'01'..'10')
-  --subst=s/REGEXP/VALUE/i  Substitute some string in the urls.
-  --404-retry       will retry on error 404 Not Found. 
-  --no404-retry     creates an empty file on error 404 Not Found.
-
-=head1 TO-DO
-
-More command-line compatibility with lwp-rget
-
-Graphical user interface
-
-=head1 COPYRIGHT
-
-Copyright (c) 2000 Flavio Glock <fglock@pucrs.br>. All rights reserved.
-This program is free software; you can redistribute it and/or
-modify it under the same terms as Perl itself.
-This program was based on examples in the Perl distribution.
-
-
-If you use it/like it, send a postcard to the author. 
-
-=cut
-
-
-
+my $VERSION = "1.026";
 
 @Config_Vars = qw/DIR_DEPTH_MAX NAME_LEN_MAX COOKIES AUTH DEPTH TIMEOUT AGENT REFERER INDEXFILE SLEEP OUT_DEPTH BASE_DIR PART_SUFFIX MAX_DOCS INVALID_CHAR LOOP SUBST DUMP DUMP_MAX RETRY_MAX/;
 
@@ -248,51 +30,53 @@ If you use it/like it, send a postcard to the author.
 
 # Defaults
 $AUTH =		'';
-$MAKEREL = 	0;
+$MAKEREL =	0;
 $MIRROR =	0;
 $MEDIAEXT =	0;
-$DEPTH = 	0;
-$TIMEOUT = 	30;
-$AGENT = 	"Mozilla/3.0 (WinNT; I)";
-$REFERER = 	".";
-$INDEXFILE = 	"_INDEX_.HTM";
+$DEPTH =	0;
+$TIMEOUT =	30;
+$AGENT =	"Mozilla/3.0 (WinNT; I)";
+$REFERER =	".";
+$INDEXFILE =	"_INDEX_.HTM";
 $SLEEP =	1;
 $OUT_DEPTH =	0;	# opcao para maximo de niveis ao sair do site (0 = nao sai)
 $BASE_DIR =	".";
 $PART_SUFFIX =	"._PART_";
 $MAX_DOCS =	10000;
 $INVALID_CHAR = '$';
-$COOKIES = 	'';
+$COOKIES =	'';
 $NAME_LEN_MAX =  30;
 $DIR_DEPTH_MAX = 8;
 
 @PREFIX =	();
-@EXCLUDE = 	(); 		# "/\\/tn_|\\?[DSMN]=[AD]|banner|\\.gif/i";
-$LOOP = 	"";		# "~~~~:1..50";
-$SUBST = 	"";		# "s/show\\.asp\\?//";
+@EXCLUDE =	();		# "/\\/tn_|\\?[DSMN]=[AD]|banner|\\.gif/i";
+$LOOP =	"";		# "~~~~:1..50";
+$SUBST =	"";		# "s/show\\.asp\\?//";
 
 $DUMP =		"";
 $DUMP_MAX =	100;
 $RETRY_MAX =	5;
 $RETRY_404 =	1;
 $SLAVE =	0;
-$STOP = 	0;
-$RESTART = 	0;
+$STOP =	0;
+$RESTART =	0;
 
 # to-be configurable
 $RETRY_TIMEOUT_MULTIPLIER = 2;
+$MAKE_BACKUP = 0;
 
 # Defaults de uso interno, nao configuravel
 $MAX_TESTE_REPETICAO =	30;	# testa os ultimos links antes de incluir na lista
-$LIST_SIZE = 	3;		# tamanho da estrutura de @links = ($url, $referer, $nivel)
+$LIST_SIZE =	3;		# tamanho da estrutura de @links = ($url, $referer, $nivel)
 
-$DUMP_SUFFIX = 		".grx";
+$DUMP_SUFFIX =		".grx";
 $TMP_SUFFIX =		"._TMP_";
-$NOT_FOUND_SUFFIX = 	"._NOT_";
-$BUSY_SUFFIX = 		"._BUSY_";
-$DONE_SUFFIX = 		"._DONE_";
+$NOT_FOUND_SUFFIX =	"._NOT_";
+$BUSY_SUFFIX =		"._BUSY_";
+$DONE_SUFFIX =		"._DONE_";
 $GLYNX_SUFFIX =		".glynx";
-$BACKUP_SUFFIX = 	".bak";
+$BACKUP_SUFFIX =	".bak";
+$POST_SEPARATOR = 	"_X_POST_X_";
 
 $CFG_FILE =		"glynx.ini";
 $NAME_TRANSLATION_FILE = "_NAMES_.HTM";
@@ -301,21 +85,24 @@ $NAME_TRANSLATION_FILE = "_NAMES_.HTM";
 # - do a restart whenever $SLAVE_RESTART_FILE file-time changes.
 # - exit whenever $SLAVE_STOP_FILE exists.
 
-$SLAVE_STOP_FILE = 	"_STOP_$GLYNX_SUFFIX";
-$SLAVE_RESTART_FILE = 	"_RESTART_$GLYNX_SUFFIX";
+$SLAVE_STOP_FILE =	"_STOP_$GLYNX_SUFFIX";
+$SLAVE_RESTART_FILE =	"_RESTART_$GLYNX_SUFFIX";
 
 # deixar fora desta lista: htm html js cgi txt cfm shtml
 @DEFAULT_EXCLUDE = qw/wav mov png swf css dcr doc rtf bak ra rm sfw pcx log ps bmp dvi pdf jar java class rar iso bin midi mid mod mpeg mpg mp3 avi jpg jpeg gif gz msi asf zip cdf exe tar/;
 $default_exclude = "/\\." . join("\$|\\.", @DEFAULT_EXCLUDE) . "\$/i";
 # print "default_exclude: $default_exclude\n";
 
-my $progname = $0;
 @myARGV = @ARGV;
-$progname =~ s|.*/||;  		# only basename left
-$progname =~ s/\.\w*$//; 	# strip extension if any
+$progname =~ s|.*/||;		# only basename left
+$progname =~ s/\.\w*$//;	# strip extension if any
 
+# $VERBOSE=1;
+print "  [ READ-CFG: $CFG_FILE ]\n" if $VERBOSE;
 &read_dump ($CFG_FILE);
+print "  [ READ-CFG: get-options ]\n" if $VERBOSE;
 &get_options;
+print "  [ READ-CFG: preprocess-options ]\n" if $VERBOSE;
 &preprocess_options;
 
 &save_Config (\%Main_Config);
@@ -325,19 +112,19 @@ $progname =~ s/\.\w*$//; 	# strip extension if any
 sub get_options {
     print "  [ GET_OPTIONS ]\n" if $VERBOSE;
     GetOptions(
-	'version'  	=> \&print_version,
-   	'help'     	=> \&usage,
+	'version'	=> \&print_version,
+	'help'	=> \&usage,
 	'cfg-save'	=> \&cfg_save_default,
-   	'depth=i'  	=> \$DEPTH,
+	'depth=i'	=> \$DEPTH,
 	'timeout=i'	=> \$TIMEOUT,
 	'agent:s'	=> \$AGENT,
 	'referer:s'	=> \$REFERER,
 	'indexfile=s'	=> \$INDEXFILE,
-	'sleep=i'  	=> \$SLEEP,
+	'sleep=i'	=> \$SLEEP,
 	'out-depth=i'	=> \$OUT_DEPTH,
 	'base-dir=s'	=> \$BASE_DIR,
 	'part-suffix=s'	=> \$PART_SUFFIX,
-	'limit=i'  	=> \$MAX_DOCS,
+	'limit=i'	=> \$MAX_DOCS,
 	'invalid-char=s'	=> \$INVALID_CHAR,
 	'prefix=s'	=> \@PREFIX,
 	'exclude:s'	=> \@EXCLUDE,
@@ -348,8 +135,8 @@ sub get_options {
 	'retry=i'	=> \$RETRY_MAX,
 	'404-retry!'	=> \$RETRY_404,		# --no404-retry
 	'slave!'	=> \$SLAVE,
-	'verbose!' 	=> \$VERBOSE,
-	'quiet!'   	=> \$QUIET,
+	'verbose!'	=> \$VERBOSE,
+	'quiet!'	=> \$QUIET,
 	'restart!'	=> \$RESTART,
 	'stop!'		=> \$STOP,
 	'mirror!'	=> \$MIRROR,
@@ -360,12 +147,12 @@ sub get_options {
 	'dir-depth-max=i'	=> \$DIR_DEPTH_MAX,
 
 	# not implemented, but exist in lwp-rget:
-	'hier'     	=> \&not_implemented('hier'),
-	'auth=s'   	=> \&not_implemented('auth'),
-	'iis'      	=> \&not_implemented('iis'),
-	'tolower'  	=> \&not_implemented('tolower'),
-	'nospace'  	=> \&not_implemented('nospace'),
-	'keepext=s' 	=> \&not_implemented('keepext'),
+	'hier'	=> \&not_implemented('hier'),
+	'auth=s'	=> \&not_implemented('auth'),
+	'iis'	=> \&not_implemented('iis'),
+	'tolower'	=> \&not_implemented('tolower'),
+	'nospace'	=> \&not_implemented('nospace'),
+	'keepext=s'	=> \&not_implemented('keepext'),
     ) || usage();
 
 }
@@ -373,6 +160,14 @@ sub get_options {
 sub preprocess_options {
 	$BASE_DIR = "." if ! $BASE_DIR;
 	$BASE_DIR =~ s/\\/\//g;
+	#print "  [ BASE_DIR: $BASE_DIR ]\n" if $VERBOSE;
+	unless (-d $BASE_DIR) {
+		print "  [ BASE-DIR: creating $BASE_DIR ]\n" if $VERBOSE;
+		&make_dir($BASE_DIR);
+	}
+	$dir = abs_path("$BASE_DIR");
+	# print "  [ BASE_DIR: $BASE_DIR + $dir ]\n" if $VERBOSE;
+	$BASE_DIR = $dir;
 	$BASE_DIR .= "/" if ! ($BASE_DIR =~ /\/$/);
 	print "  [ BASE_DIR: $BASE_DIR ]\n" if $VERBOSE;
 
@@ -402,6 +197,7 @@ sub retrieve_Config {
 }
 
 sub show_Config {
+
 	my ($hashref) = @_;
 	print "  [ SHOW-CONFIG ]\n" if $VERBOSE;
 	foreach(@Config_Vars) {
@@ -468,62 +264,63 @@ sub my_main {
 	# $prefix = $PREFIX[0];
 	$Dump_index = 0;
 
-    if ( ($url =~ /$DUMP_SUFFIX$/) and !($url =~ /:/) ) {
-	# DUMP:
-	# verifica se o nome corresponde a um arquivo dump
-	   if (-e "$url") 		{ $dump_filename = "$url"; }
-	elsif (-e "$BASE_DIR$url") 	{ $dump_filename = "$BASE_DIR$url"; }
-	elsif (-e "$url$DUMP_SUFFIX") 	{ $dump_filename = "$url$DUMP_SUFFIX"; }
-	elsif (-e "$BASE_DIR$url$DUMP_SUFFIX") { $dump_filename = "$BASE_DIR$url$DUMP_SUFFIX"; }
-	else  { die "  [ CAN'T FIND INPUT FILE: $url ]" }
-	read_dump($dump_filename);
-	# read_dump($DUMP) if $DUMP;	# evita perder informacao ???
+	if ( ($url =~ /$DUMP_SUFFIX$/) and !($url =~ /:/) ) {
+		# DUMP:
+		# verifica se o nome corresponde a um arquivo dump
+		if (-e "$url")		{ $dump_filename = "$url"; }
+		elsif (-e "$BASE_DIR$url")	{ $dump_filename = "$BASE_DIR$url"; }
+		elsif (-e "$url$DUMP_SUFFIX")	{ $dump_filename = "$url$DUMP_SUFFIX"; }
+		elsif (-e "$BASE_DIR$url$DUMP_SUFFIX") { $dump_filename = "$BASE_DIR$url$DUMP_SUFFIX"; }
+		else  { die "  [ CAN'T FIND INPUT FILE: $url ]" }
+		read_dump($dump_filename);
+		# read_dump($DUMP) if $DUMP;	# evita perder informacao ???
     }
-    elsif ($url) {
-	# URL:
-	# pega o nome do site
-	$REFERER = $url unless $REFERER;
-	print "  [ URL: abs: $url ]\n" if $VERBOSE;
-	$u1 = URI::URL->new_abs($url, $REFERER);
-	#$myhost = $u1->host; 
-	#print "Host: $myhost\n";
-	unless ($#PREFIX >= 0) {
-		print "  [ PREFIX: abs: $PREFIX[0] ]\n" if $VERBOSE;
-		$prefix = URI::URL->new_abs($PREFIX[0], $u1);
-		print "  [ PREFIX: Gerado: $prefix ]\n" if $VERBOSE;
-		# clear fragment, query...
+	elsif ($url) {
+		# URL:
+		# pega o nome do site
+		$REFERER = $url unless $REFERER;
+		print "  [ URL: abs: $url ]\n" if $VERBOSE;
+		$u1 = URI::URL->new_abs($url, $REFERER);
+		#$myhost = $u1->host; 
+		#print "Host: $myhost\n";
 
-		# test for invalid protocol
+		unless ($#PREFIX >= 0) {
+			print "  [ PREFIX: abs: $PREFIX[0] ]\n" if $VERBOSE;
+			$prefix = URI::URL->new_abs($PREFIX[0], $u1);
+			print "  [ PREFIX: Gerado: $prefix ]\n" if $VERBOSE;
+			# clear fragment, query...
 
-		eval{$prefix->userinfo('')};
-		if ($eval_err = $@) {
-			print "  [ PREFIX: Error: $eval_err ]\n";
-			print "  [ PREFIX: Error: Possible cause: invalid protocol ]\n" if $VERBOSE;
-		}
-		else {
-			# $prefix->params('');
-			$prefix->query('');
-			$prefix->fragment('');
+			# test for invalid protocol
 
-			# removes file name
-			unless ($prefix =~ /\/$/) {
-				($prefix) = $prefix =~ /^(.*\/)/;
-				print "  [ PREFIX: new: $prefix ]\n" if $VERBOSE;
+			eval{$prefix->userinfo('')};
+			if ($eval_err = $@) {
+				print "  [ PREFIX: Error: $eval_err ]\n";
+				print "  [ PREFIX: Error: Possible cause: invalid protocol ]\n" if $VERBOSE;
 			}
-		      	# removes authentication
-			if ($prefix =~ /\@/) {
-				($prefix) = $prefix =~ /.*\@(.*)/;
-				print "  [ PREFIX: new: $prefix ]\n" if $VERBOSE;
+			else {
+				# $prefix->params('');
+				$prefix->query('');
+				$prefix->fragment('');
+
+				# removes file name
+				unless ($prefix =~ /\/$/) {
+					($prefix) = $prefix =~ /^(.*\/)/;
+					# print "  [ PREFIX: new: $prefix ]\n" if $VERBOSE;
+				}
+				# removes authentication
+				if ($prefix =~ /\@/) {
+					($prefix) = $prefix =~ /.*\@(.*)/;
+					print "  [ PREFIX: new: $prefix ]\n" if $VERBOSE;
+				}
+				@PREFIX = ($prefix);
+				print "  [ PREFIX: @PREFIX ]\n" unless $QUIET;
 			}
-			@PREFIX = ($prefix);
-			print "  [ PREFIX: @PREFIX ]\n" unless $QUIET;
 		}
 		&insert_url ($url, $REFERER, $DEPTH);
 	}
-    }
-    else {
-	print "  [ NO URL ]\n" unless $QUIET;
-    }
+	else {
+		# print "  [ NO URL ]\n" unless $QUIET;
+	}
 
 download_links_retry:
 
@@ -561,12 +358,12 @@ download_links_retry:
 
     if (($#retry >= 0) and ($retry > 1)) {
 	print "  [ RETRY: LEVEL:", $RETRY_MAX - $retry + 2, "/$RETRY_MAX URL:", +($#retry + 1) / $LIST_SIZE, " ]\n" unless $QUIET;
-  	$retry--;
-  	@links = 	@retry;
+	$retry--;
+	@links =	@retry;
 	@processed =	();
 	@retry =	();
-	# @dump = 	();
-	# $Dump_index = 	0;
+	# @dump =	();
+	# $Dump_index =	0;
 	$RETRY_TIMEOUT_MULTIPLIER = 1  if $RETRY_TIMEOUT_MULTIPLIER < 1;
 	$RETRY_TIMEOUT_MULTIPLIER = 10 if $RETRY_TIMEOUT_MULTIPLIER > 10;
 	$TIMEOUT *= $RETRY_TIMEOUT_MULTIPLIER;
@@ -578,7 +375,7 @@ download_links_retry:
 	if ($#retry < 0) {
 		print "  [ DONE: DON'T NEED TO RETRY ]\n" if $VERBOSE;
 	}
-  	elsif ($retry > 1) {
+	elsif ($retry > 1) {
 		print "  [ FAILED: URL:$retry ]\n" if $VERBOSE;
 	} 
 	else {
@@ -590,11 +387,13 @@ download_links_retry:
 	@dump = (@dump, @retry);
 
 	print "  [ DUMP: [$DUMP] ", +($#dump + 1) / $LIST_SIZE, " ]\n" if $VERBOSE;
-    	while (($Dump_index <= $#dump) and $DUMP) {
+	while (($Dump_index <= $#dump) and $DUMP) {
 		&dump;
-    	}
+	}
 
 	# check for Slave mode
+
+	$just_slave = 1;
 
 SLAVE_IDLE:
     while ($SLAVE) {
@@ -617,18 +416,29 @@ SLAVE_IDLE:
 		print "  [ SLAVE: CANCELLED ]\n" unless $QUIET;
 		last SLAVE_IDLE;
 	}
-	print "  [ SLAVE: IDLE FOR $TIMEOUT SEC ]\n" unless $QUIET;
-	&my_sleep ($TIMEOUT);
+
+	if ($just_slave) {
+		print "  [ SLAVE: IDLE FOR $SLEEP SEC ]\n" unless $QUIET;
+		&my_sleep ($SLEEP);
+		$just_slave = 0;
+	}
+	else {
+		print "  [ SLAVE: IDLE FOR $TIMEOUT SEC ]\n" unless $QUIET;
+		&my_sleep ($TIMEOUT);
+	}
+
 	# what's in dir?
 	$dir_expr = "$BASE_DIR";
 	opendir DIR, $dir_expr or die "  [ SLAVE: CAN'T OPEN $dir_expr ]\n";
-    		@dir =  readdir(DIR); 	
+		@dir =  readdir(DIR);	
 		print "  [ SLAVE: DIR: $BASE_DIR -- ", join(',',@dir), " ]\n" if $VERBOSE;
 		@dir = grep { (/$DUMP_SUFFIX$/) and (-f "$BASE_DIR$_") } @dir;
 	closedir DIR;
 	print "  [ SLAVE: $dir_expr: $DUMP_SUFFIX -- ", join(',',@dir), " ]\n" if $VERBOSE;
 	$dir_index = 0;
-    SLAVE_TEST_DIR:
+
+SLAVE_TEST_DIR:
+
 	while ($#dir >= $dir_index) {
 		# rename file
 		$dir = "$BASE_DIR$dir[$dir_index]";
@@ -658,14 +468,14 @@ SLAVE_IDLE:
 		read_dump($dir_busy);
 		$Slave_file = $dir;
 		print "  [ SLAVE: processing $Slave_file ]\n" unless $QUIET;
-		last SLAVE_IDLE;
+		last SLAVE_IDLE
 	} # dir ok
     } # slave
 
     if ($SLAVE) {
 	# ??? get_options;
 	# read_dump ($CFG_FILE);
-	&retrieve_Config (\%Main_Config);
+	# &retrieve_Config (\%Main_Config);	# removed after v1.024
 
 	print "  [ SLAVE: continue processing $Slave_file ]\n" if $VERBOSE;
 	$url = "";
@@ -747,21 +557,26 @@ sub check_stop {
 }
 
 # Download List File Format:
-#   // xxx      - comment
-#   tag: value
-#   //[any_var_name]: [value]
+#   [//] space [comment]
+#   [//]tag: space value
+#   [//]any_var_name: space value
 # Tags:
-#   URL: xxx    - URL
-#   //Referer:	- referrer URL
-#   //Depth:	- link levels to download from the URL
+#   URL: xxx	- URL
+#   Referer:	- referrer URL
+#   Depth:	- link levels to download from the URL
 # Reserved, unimplemented tags:
-#   File: xxx   -- Absolute path\filename for file (DOS style slashes)
-#   Desc: xxx   -- Description
-#   User: xxx   -- Username
-#   Pass: xxx   -- Password (encrypted)
-#   Alt: xxx    -- Alternate URL (multiple)
-# Names are Case-Sensitive.
-# "//" is for compatibility with other download managers and may be ommitted.
+#   File: xxx	-- Absolute path\filename for file (DOS style slashes)
+#   Desc: xxx	-- Description
+#   User: xxx	-- Username
+#   Pass: xxx	-- Password (encrypted)
+#   Alt: xxx	-- Alternate URL (multiple)
+#
+#	names are Case-Sensitive.
+#	"//" is for compatibility with other download managers and may be ommitted.
+#	"//" is read as [!\w\s]*
+#	values may have single-quotes as delimiters.
+#	values may contain single-quotes and spaces.
+#	single-quotes don't need to be escaped.
 
 sub read_dump {
 	my ($dump_filename) = @_;
@@ -769,10 +584,12 @@ sub read_dump {
 	# @tmp_prefix = @PREFIX;
 	# ??? @PREFIX = ();		# will use file's prefixes
 
+	# print "  [ DUMP: opening $dump_filename ]\n" if $VERBOSE;
 	if (! -e $dump_filename) { 
 		$dump_filename = "$BASE_DIR$dump_filename"; 
 		if (! -e $dump_filename) { return }
 	}
+	print "  [ DUMP: opening $dump_filename ]\n" if $VERBOSE;
 	open(FILE, $dump_filename) or die "  [ DUMP: Can't open $dump_filename ]";
 
 		#//OUT_DEPTH: 0
@@ -787,7 +604,7 @@ sub read_dump {
 
 		# reset parameters
 		$url =		"";
-		#File: 		-- not used ???
+		#File:		-- not used ???
 		$referer =	$REFERER;
 		$depth =	$DEPTH;	
 
@@ -795,18 +612,20 @@ sub read_dump {
 			chomp;
 			($cmd, $opt) = split(" ", $_, 2);
 			if ($cmd =~ /URL:/i) {
-				# $prefix = 	$PREFIX[0];
+				# $prefix =	$PREFIX[0];
 				&insert_url ($url, $referer, $depth) if $url;
 				# reset parameters
-				$url = 		$opt;
-				#File: 		-- not used ???
+				$url =		$opt;
+				#File:		-- not used ???
 				$referer =	$Referer;
 				$depth =	$Depth;	
 			} 
 			elsif ($cmd =~ /(\w*):/) {
 				$var_name = $1;
-				if ($opt =~ /^'/) { }
-				else { $opt = "'" . $opt . "'"; }
+
+				$opt = $1 if $opt =~ /^'(.*)'\s*$/;	# remove delimiters
+				$opt =~ s/'/\\'/;	# escape other delimiters
+				$opt = "'" . $opt . "'";	# put delimiters back
 
 				if (grep { /^$var_name$/ } @Config_Arrays) {
 					eval "\push @" . $var_name . ", $opt";
@@ -909,7 +728,7 @@ sub cfg_save {
 		# Write out actual prefix in use, instead of the (maybe null) config prefix. 
 		# Otherwise it may happen that the links will be rejected as "out" when read.
 		# @tmp_prefix = @PREFIX;
-	 	# $PREFIX[0] = $prefix;
+		# $PREFIX[0] = $prefix;
 
 		print FILE <<EOT; 
 // Generated by $progname.pl Version $VERSION - Copyright 2000, Flavio Glock.
@@ -936,11 +755,11 @@ sub make_filename {
 	my ($url) = @_;
 	my ($host, $port, $path, $query);	# $params, 
 
-	$u1 = 		URI::URL->new($url);
+	$u1 =		URI::URL->new($url);
 	$host =		$u1->host;
 	$port =		$u1->port;
 	$path =		$u1->path;
-	# $params = 	$u1->params;
+	# $params =	$u1->params;
 	$query =	$u1->query;
 	return &make_filename_from_parts($host, $port, $path, $query);
 }
@@ -959,7 +778,80 @@ sub check_translation_file {
 		if ($tr_str) {
 			# "<a href=$new_name>$filename</a><br>\n"
 			($new_name) = $tr_str =~ /=(.*?)>/;
-			print "  [ SHORTER-NAME: FOUND: $tr_str => $new_name ]\n" if $VERBOSE;
+			# print "  [ SHORTER-NAME: FOUND: $tr_str => $new_name ]\n" if $VERBOSE;
+			return $new_name;
+		}
+	}
+	return '';
+}
+
+sub check_translation_url {
+	my ($short_filename, $short_parent) = @_;
+	my ($trans_filename, @a, $tr_str, $new_name);
+	my (@parent_parts, $local_parent, $my_parent);
+
+	# split parent and test path translations... ???
+	($local_parent) = $short_parent =~ /$BASE_DIR(.*)/;
+	@parent_parts = split('/', $local_parent);
+	push @parent_parts, $short_filename;
+	# print "  [ check_translation_url: ", join(" ", @parent_parts), " ]\n" if $VERBOSE;
+
+	UP: foreach (1 .. $#parent_parts) {
+		if ($parent_parts[$_] eq '..') {
+			splice (@parent_parts, $_ - 1, 2);
+			print "  [ SPLICE: ", join(" ", @parent_parts), " ]\n" if $VERBOSE;
+			redo UP;
+		}
+	}
+
+	# check that each parent exists, or that it has an alias.
+	$local_parent = $BASE_DIR;
+	$local_url = "";
+	foreach (0 .. $#parent_parts) {
+		$interim_name = check_translation_url_node($parent_parts[$_], $local_parent);
+		unless ($interim_name) {
+			$my_parent = $local_parent . $parent_parts[$_];
+			if (-e $my_parent) {
+				# print "  [ short: exists: $my_parent ]\n";
+				$interim_name = $parent_parts[$_];
+			}
+			else {
+				# print "  [ short: not found: $my_parent -- using it anyway ]\n";
+				# To-do -- ??? (maybe it is ok)
+				$interim_name = $parent_parts[$_];
+			}
+		}
+		# print "  [ short: found $interim_name ]\n";
+		# $my_parent = $local_parent . $interim_name . '/';
+		$local_parent .= $parent_parts[$_] . '/';
+		$local_url    .= $interim_name . '/';
+	}
+	# now put the filename on it
+	# ...
+	$local_url =~    s/${INDEXFILE}\/?$//;
+	$local_parent =~ s/${INDEXFILE}\/?$//;
+	unless (-d "$BASE_DIR$local_parent") {
+		$local_url =~    s/\/$//;
+		$local_parent =~ s/\/$//;
+		# print "  [ short: NOT-DIR: $local_parent => $local_url ]\n";
+	}
+	# print "  [ short: END $local_parent => $local_url ]\n" if $VERBOSE;
+	return $local_url;
+}
+
+sub check_translation_url_node {
+	my ($filename, $parent) = @_;
+	# do we have a $NAME_TRANSLATION_FILE ?
+	$trans_filename = "$parent/$NAME_TRANSLATION_FILE";
+	if (-s $trans_filename) {
+		open (TRFILE, $trans_filename); 
+			@a = <TRFILE>; 
+		close (TRFILE);
+		($tr_str) = grep { /=\Q${filename}\E>/ } @a;
+		if ($tr_str) {
+			# "<a href=$new_name>$filename</a><br>\n"
+			($new_name) = $tr_str =~ />(.*?)</;
+			# print "  [ URL-NAME: FOUND: $tr_str => $new_name ]\n" if $VERBOSE;
 			return $new_name;
 		}
 	}
@@ -974,19 +866,17 @@ sub log_translation_file {
 	open (TRFILE, ">>$trans_filename") or print "  [ ERR: WRITING $trans_filename - $^E ]\n"; 
 		print TRFILE "<a href=$new_name>$filename</a><br>\n"; 
 	close (TRFILE);
-	print "  [ SHORTER-NAME: LOGGED: $new_name at $trans_filename ]\n" if $VERBOSE;
+	# print "  [ SHORTER-NAME: LOGGED: $new_name as $filename at $trans_filename ]\n" if $VERBOSE;
 	return;
 }
 
 sub make_shorter_name {
-	my ($filename, $parent) = @_;
-	# ... md5 ... $NAME_LEN_MAX ...
-
+	my ($filename, $parent, $urlname) = @_;
 	my ($new_name, $trans_filename, @a, $name, $extension, $maxname);
 	my ($random_1, $random_2, $rnd);
 
 	# do we have a name in $NAME_TRANSLATION_FILE ?
-	if ($new_name = check_translation_file($filename, $parent)) {
+	if ($new_name = check_translation_file($urlname, $parent)) {
 		@_[0] = $new_name;
 		return;
 	}
@@ -994,7 +884,7 @@ sub make_shorter_name {
 	($name, $extension) = split('\.',$filename,2);
 	if (length($extension) > 10) {
 		# invalid extension? -- arbitrary limit
-		print "  [ SHORTER-NAME: invalid extension: $extension ]\n" if $VERBOSE;
+		# print "  [ SHORTER-NAME: invalid extension: $extension ]\n" if $VERBOSE;
 		($name, $extension) = ($filename,'');
 	}
 	$extension =~ tr/\//${INVALID_CHAR}/;	# in case this is a joined subdirectory name
@@ -1012,9 +902,9 @@ sub make_shorter_name {
 		print "  [ SHORTER-NAME: $name + $extension ]\n" if $VERBOSE;
 		# 4 digits should be enough
 		$digits = 4;					# 1000 .. 9999
-		$random_1 = '1' . ('0' x ($digits - 1)); 	# 1 => 1000
-		$random_2 = $random_1 . '0'; 			# 2 => 10000
-		print " formula: int(rand($random_2 - $random_1)) + $random_1 \n";
+		$random_1 = '1' . ('0' x ($digits - 1));	# 1 => 1000
+		$random_2 = $random_1 . '0';			# 2 => 10000
+		# print " formula: int(rand($random_2 - $random_1)) + $random_1 \n";
 		$maxname = $maxname - $digits + 1;
 		$base_name = substr($name, 0, $maxname);
 		$base_name =~ tr/\//${INVALID_CHAR}/;	# in case this is a joined subdirectory name
@@ -1024,46 +914,60 @@ sub make_shorter_name {
 			$new_name = $base_name . $rnd;
 			$new_name .= '.' . $extension if $extension;
 			# check for duplicate names
-			print "  [ SHORTER-NAME: VERIFYING UNIQUE $new_name ]\n" if $VERBOSE;
+			# print "  [ SHORTER-NAME: VERIFYING UNIQUE $new_name ]\n" if $VERBOSE;
 		} while grep { /=$new_name>/ } @a;
 	}
 	# log the name-change
-	log_translation_file($filename, $new_name, $parent) if $filename ne $new_name;
+	log_translation_file($urlname, $new_name, $parent) if $urlname ne $new_name;
 	@_[0] = $new_name;
 }
 
 sub make_filename_from_parts {
 	my ($host, $port, $path, $query) = @_;
-	my ($name);
-	my ($depth1, @file_names, $parent);
+	my ($name, $depth1, @file_names, $parent);
+
+	# keep original names somewhere
+	my ($url_name, @url_names);
+	my ($url_host, $url_port, $url_path, $url_query) =
+	($host, $port, $path, $query);
 
 	$name = $host;
-	$name .= '_' . $port if ($port != 80) and ($name);
+	$name .= $INVALID_CHAR . $port if ($port != 80) and ($name);
 
-	$path =~ tr/\\/\//;		   	# \ => /
-	$path =~ s/\/$/\/${INDEXFILE}/g;    	# final slash => "/$INDEXFILE"
+	$url_name = $url_host;
+	$url_name .= ":" . $url_port if ($port != 80) and ($url_name);
+
+	$path =~ tr/\\/\//;			# \ => /
+	$path =~ s/\/$/\/${INDEXFILE}/g;	# final slash => "/$INDEXFILE"
 	$path =~ s/\/\//\//g;			# // => /
 	$path =~ s/\/[^\/]*?\/\.\.\//\//g;	# /aaa/xxx/../ => /aaa/
-	$query =~ tr/ \\ \/ : \* \? \" < > \| /${INVALID_CHAR}/;	# invalid chars
+	$query =~ s/[\\\/\:\*\?\"\<\>\|]/${INVALID_CHAR}/g;	# invalid chars
 
 	$name .= $path;
-	$name =~ tr/ : \* \? \" < > \| /${INVALID_CHAR}/;
+	$name =~ s/[\:\*\?\"\<\>\|]/${INVALID_CHAR}/g;
+
+	$url_path =~ s/\/[^\/]*?\/\.\.\//\//g;	# /aaa/xxx/../ => /aaa/
+	$url_name .= $url_path;
 
 	$name .= $INVALID_CHAR . $query if $query;
-	$name =~ s/\.$/\$/;		   	# final dot => invalid char
+	$name =~ s/\.$/\$/;			# final dot => invalid char
+
+	$url_name .= "\?" . $url_query if $query;
 
 	# Win-NT charset:
-	# 	allowed:	= & _ - space
-	# 	not allowed:	\ / : * ? " < > |
+	#	allowed:	= & _ - space
+	#	not allowed:	\ / : * ? " < > |
 	# Win-NT names with dots:
 	#	allowed:	.* ..* ...*
 	#			*.* *..* *...*
 	#	not allowed:	. .. *.
 
- 	print "  [ NAME: $name => (host) $host (path) $path (query) $query ]\n" if $VERBOSE;
+	# print "  [ NAME: $name => (host) $host (path) $path (query) $query ]\n" if $VERBOSE;
+	# print "  [ NAME: $url_name => $name ]\n" if $VERBOSE;
 
 	@file_names = split("\/", $name);
- 	#print "  [ NAME: name_depth: $#file_names file_name: $file_names[-1] ]\n" if $VERBOSE;
+	@url_names =  split("\/", $url_name, $#file_names + 1);
+	# print "  [ NAME: name_depth: $#file_names file_name: $file_names[-1] ]\n" if $VERBOSE;
 
 	# up to 2 times dir depth reduction, by joining pairs of dir-names.
 
@@ -1074,6 +978,8 @@ sub make_filename_from_parts {
 			if (($#file_names > $DIR_DEPTH_MAX) and ($_ <= $#file_names)) {
 				splice(@file_names, -$_, 2, 
 					$file_names[-$_] . "/" . $file_names[1-$_]);
+				splice(@url_names, -$_, 2, 
+					$url_names[-$_] . "/" . $url_names[1-$_]);
 			}
 		}
 	}
@@ -1087,6 +993,8 @@ sub make_filename_from_parts {
 			if (($#file_names > $DIR_DEPTH_MAX) and ($_ <= $#file_names)) {
 				splice(@file_names, -$_, 2, 
 					$file_names[-$_] . "/" . $file_names[1-$_]);
+				splice(@url_names, -$_, 2, 
+					$url_names[-$_] . "/" . $url_names[1-$_]);
 			}
 		}
 	}
@@ -1096,20 +1004,63 @@ sub make_filename_from_parts {
 	$parent = $BASE_DIR;
 	foreach (0 .. $#file_names) {
 		if ((length($file_names[$_]) > $NAME_LEN_MAX) or ($file_names[$_] =~ /\//)) {
-			print "  [ NAME: CHANGE: $file_names[$_] at $parent ]\n";
-			&make_shorter_name($file_names[$_], $parent);
-			print "  [ NAME: NOW IS: $file_names[$_] ]\n";
+			# print "  [ NAME: CHANGE: $url_names[$_] to $file_names[$_] at $parent ]\n";
+			&make_shorter_name($file_names[$_], $parent, $url_names[$_]);
+			# print "  [ NAME: NOW IS: $file_names[$_] ]\n";
 		}
 		$parent .= "/" unless $parent =~ /\/$/;
 		$parent .= $file_names[$_];
 	}
 
 	$name = join("\/", @file_names);
- 	print "  [ NAME: name_depth: $#file_names file_name: $file_names[-1] name: $name ]\n" if $VERBOSE;
+	print "  [ NAME: name_depth: $#file_names file_name: $file_names[-1] name: $name ]\n" if $VERBOSE;
 
 	return $name;
 }
 
+
+sub modify_file_attrib {
+	my ($name,$attrib,$value) = @_;
+	my ($filename, $parent, @a, $trans_filename);
+	($parent, $filename) = $name =~ /^(.*)\/(.*?)$/;
+	print "  [ MODIFY-FILE-ATTRIB: $parent -> $filename ATTRIB: $attrib: $value ]\n" if $VERBOSE;
+
+	$trans_filename = "$parent/$NAME_TRANSLATION_FILE";
+	open (TRFILE, $trans_filename); 
+		@a = <TRFILE>; 
+	close (TRFILE);
+
+	foreach( grep { />\Q${filename}\E</ } @a ) {
+		return if (/ $attrib: $value /);
+		s/\s?<br>$/ $attrib: $value <br>/;
+		print "  [ MODIFY-FILE-ATTRIB: $_ ]\n" if $VERBOSE;
+		return;
+	}
+	push @a, "<a href=$filename>$filename</a> $attrib: $value <br>\n"; 
+	&make_dir($trans_filename);
+	open (TRFILE, ">$trans_filename") or print "  [ ERR: WRITING $trans_filename - $^E ]\n"; 
+		print TRFILE join('', @a); 
+	close (TRFILE);
+	print "  [ MODIFY-FILE-ATTRIB: NEW: @a[-1] ]\n" if $VERBOSE;
+}
+
+sub get_file_attrib {
+	my ($name,$attrib) = @_;
+	my $value = '';
+	my ($filename, $parent, @a, $trans_filename);
+	($parent, $filename) = $name =~ /^(.*)\/(.*?)$/;
+	print "  [ GET-FILE-ATTRIB: $parent -> $filename ATTRIB: $attrib: $value ]\n" if $VERBOSE;
+
+	$trans_filename = "$parent/$NAME_TRANSLATION_FILE";
+	open (TRFILE, $trans_filename); 
+		@a = <TRFILE>; 
+	close (TRFILE);
+
+	foreach( grep { />\Q${filename}\E</ } @a ) {
+		return $1 if (/ $attrib: (\S*) /);
+	}
+	return '';
+}
 
 sub make_dir {
 	# o parametro para make_dir deve incluir a base
@@ -1118,8 +1069,10 @@ sub make_dir {
 	return if (-d $name);
 
 	my (@a, $a, $b, $temp, $dest);
-   	# cria o diretorio
+	# cria o diretorio
 	@a = split('/', $name);
+	push @a, '' if $name =~ /\/$/;
+
 	$a = '';
 	foreach(0 .. $#a - 1) {
 		$a .= $a[$_] . '/';
@@ -1157,7 +1110,7 @@ sub make_dir {
 }
 
 sub my_unlink {
- 	my ($source) = @_;
+	my ($source) = @_;
 	if (-d $source) {
 		print "  [ ERR: WILL NOT UNLINK DIRECTORY ]\n"; 
 		return; 
@@ -1169,7 +1122,7 @@ sub my_unlink {
 
 sub my_link {
 	# note: link will COPY files on Windows
- 	my ($source, $dest) = @_;
+	my ($source, $dest) = @_;
 	return if $source eq $dest;
 	unless (-e $source) {
 		print "  [ LINK: CAN'T FIND $source ]\n" unless $QUIET;
@@ -1188,7 +1141,7 @@ sub my_link {
 }
 
 sub my_create_empty {
- 	my ($source) = @_;
+	my ($source) = @_;
 	print "  [ CREATE-EMPTY: $source ]\n" if $VERBOSE;
 	open (FILE, ">>$source");
 		binmode FILE; print FILE "";
@@ -1196,7 +1149,7 @@ sub my_create_empty {
 }
 
 sub my_copy {
- 	my ($source, $dest) = @_;
+	my ($source, $dest) = @_;
 	return if $source eq $dest;
 	unless (-e $source) {
 		print "  [ COPY: CAN'T FIND $source ]\n";
@@ -1227,7 +1180,7 @@ sub my_copy {
 }
 
 sub my_rename {
- 	my ($source, $dest) = @_;
+	my ($source, $dest) = @_;
 	return if $source eq $dest;
 	unless (-e $source) {
 		print "  [ RENAME: CAN'T FIND $source ]\n";
@@ -1298,6 +1251,10 @@ sub download_callback {
 	# Content-Length: 10000
 	# Content-Range: bytes 10329-20328/20329
 
+	# print "  [ RANGE: RESPONSE->HEADER = ", $response->header, " ] \n" if $VERBOSE;
+
+	print "." if $VERBOSE;
+
 	if ($num_callback == 1) {
 		if ($response->code == 206) { 
 			($content_begin) = $response->header("Content-Range") =~ /bytes\s+(\d+)-/;
@@ -1317,7 +1274,7 @@ sub download_callback {
 
 	open(FILE, ">>$filename$PART_SUFFIX") or 
 			die "Cannot write to $filename$PART_SUFFIX";
-        	binmode(FILE);
+		binmode(FILE);
 	        local($\) = ""; # ensure standard $OUTPUT_RECORD_SEPARATOR
 		print FILE $data;
 	close(FILE);
@@ -1325,14 +1282,14 @@ sub download_callback {
 	#print "  [ CALLBACK = ", $num_callback, " ] \n";
 	#print "  [ RESPONSE->CODE = ", $response->code, " ] \n";
 	#print "  [ RESPONSE->Content-Range = ", $response->header("Content-Range"), " ] \n";
-	#print "  [ RESPONSE->HEADER = ", $response->as_string, " ] \n";
 }
 
 
 
 sub download {
 	my ($url, $referer, $nivel) = @_;
-	$mime_text_html = 0;
+	$mime_text_html = 0;	# should process links?
+	$downloaded = 0;	# new file or cache?
 	$Content_Type = '';
 	$u1 = $url;
 	# cuida para ficar neste host
@@ -1386,7 +1343,7 @@ sub download {
 		$mtime = (stat($filename))[9];
 	}
 
-	&make_dir($name);
+	&make_dir("$BASE_DIR$name");
 	# print "Download: $url\n";
 
 	if ($DUMP and ($nivel < 1) and ($dump_nivel_zero)) {
@@ -1395,9 +1352,7 @@ sub download {
 		return;
 	}
 
-    	if ($SLEEP) {
-		&my_sleep($SLEEP);
-	}
+	&my_sleep($SLEEP);
 
 	# GET:
 	print "  [ GET: $u1 ]\n" unless $QUIET;
@@ -1406,7 +1361,7 @@ sub download {
 	# declare preference for "html" directory listings, if "ftp"
 	$req->header('Accept' => 'text/html;q=1.0,*/*;q=0.6');
 
-	$req->authorization_basic(split (/:/, $AUTH)) if ($AUTH);
+	$req->authorization_basic(split (/:/, $AUTH),2) if ($AUTH);
 
 	if ($mtime) {
 		print "  [ If-Modified-Since: ", HTTP::Date::time2str($mtime), " ]\n" if $VERBOSE;
@@ -1417,13 +1372,13 @@ sub download {
 
 	# RESUME:
 	# The first-byte-pos value in a byte-range-spec gives the byte-offset
-   	# of the first byte in a range. The last-byte-pos value gives the
-   	# byte-offset of the last byte in the range; that is, the byte
-   	# positions specified are inclusive. Byte offsets start at zero.
+	# of the first byte in a range. The last-byte-pos value gives the
+	# byte-offset of the last byte in the range; that is, the byte
+	# positions specified are inclusive. Byte offsets start at zero.
 	# Range: bytes=9500-
 	$filesize = 0 + (-s "$filename$PART_SUFFIX");
-	if ($filesize != 0) 
-	{
+	# if ($filesize != 0) 
+	# {
 		&select_best_sample($filename);
 		$filesize = 0 + (-s "$filename$PART_SUFFIX");
 		$num_callback = 0;
@@ -1432,8 +1387,23 @@ sub download {
 		#$req->push_header("Range" => "bytes=$filesize-$file_end");
 		$req->push_header("Range" => "bytes=$filesize-");
 		print "  [ REQUEST = ", $req->as_string, " ] \n" if $VERBOSE;
-		# chama o callback
-		$res = $ua->request($req, \&download_callback, 65536); 	# 65536); 
+
+		if ($url =~ /ftp:\/\//i) {
+			$res = ftp::request($req, $TIMEOUT, \&download_callback);
+		}
+		else {
+
+			if ($url =~ /(.*?)$POST_SEPARATOR(.*?)/) {
+				$req->uri($1);
+				$req->content($2);
+				$req->method("POST");
+				$req->content_type('application/x-www-form-urlencoded');
+				print "  [ POST: ", $req->as_string(), " ]\n" if $VERBOSE;
+			}
+
+			$res = $ua->request($req, \&download_callback, 65536);	# 65536); 
+		}
+
 		if ($res->header("X-Died")) {
 			# circula os arquivos de tentativas - depois deve escolher a melhor
 			&select_best_sample($filename);
@@ -1455,11 +1425,11 @@ sub download {
 				print "  [ CONTENT: OK: $file_size/$content_size BYTES ] \n" if $VERBOSE;
 			}
 		}
-	}
-	else {
-		# normal download to file
-		$res = $ua->request($req, "$filename$PART_SUFFIX");
-	}
+	# }
+	# else {
+	#	# normal download to file
+	#	$res = $ua->request($req, "$filename$PART_SUFFIX");
+	# }
 
 	# DOWNLOAD FINISHED OR ABORTED
 
@@ -1472,7 +1442,7 @@ sub download {
 		if (($msg =~ /404/) and ($url =~ /(.*)${INDEXFILE}$/)) {
 			# looks like we are re-processing the cache...
 			# try to find out original URL
-			print "  [ OOPS: Are we re-processing the cache? $1 => LATER ]\n" unless $QUIET;
+			print "  [ OOPS: Are we re-processing the cache? Trying $1 ]\n" unless $QUIET;
 			push_list (\@retry, $1, $referer, $nivel);
 		}
 		elsif (($msg =~ /404/) and (! $RETRY_404)) {
@@ -1507,6 +1477,7 @@ sub download {
 		&my_rename ("$filename$PART_SUFFIX", "$filename");
 		&my_unlink ("$filename$PART_SUFFIX-1");
 
+		$downloaded = 1;	# new file, not cache
 		$num_docs++;
 
 		print "  [ RESPONSE <<\n", $res->as_string, "    >> RESPONSE ]\n" if $VERBOSE;
@@ -1522,6 +1493,8 @@ sub download {
 		#Last-Modified: Mon, 17 Apr 2000 18:13:11 GMT
 
 		$Content_Type = $res->content_type;
+
+		modify_file_attrib($filename, 'Content-Type', $Content_Type);
 
 		# (from: UserAgent.pm)
 		if (my $lm = $res->last_modified) {
@@ -1551,7 +1524,7 @@ sub download {
 		unless ($content_base) {
 			# try to guess base
 			$base = $res->base;
-			$u1 = 	URI::URL->new_abs($base,$url);
+			$u1 =	URI::URL->new_abs($base,$url);
 			$base = $u1;
 			$base =~ s/\?.*//;  # remove query
 			print "  [ BASE_PATH: $base ]\n" if $VERBOSE;
@@ -1560,16 +1533,16 @@ sub download {
 		}
 		#if ($content_base) {
 		#	$dir_base = &make_filename($content_base);
-		#	&make_dir($dir_base);  			     # should do this LATER!
+		#	&make_dir($dir_base);			     # should do this LATER!
 		#}
 
 		# check if url directory changed
 		#$base_filename = &make_filename($base);
 
 		# find out file name with query, without directory
-		$u1 = 		URI::URL->new($url);
+		$u1 =		URI::URL->new($url);
 		$path =		$u1->path;
-		$path =~ 	s|^(.*)\/||g;   # remove directory
+		$path =~	s|^(.*)\/||g;   # remove directory
 		#($url_base) =	$u1 =~ /(.*)$path/;
 		#print "  [ GET PATH: $url_base $path ]\n" if $VERBOSE;
 
@@ -1596,10 +1569,10 @@ sub download {
 		$location = $res->header("Location");
 		if ($location) {
 			if ($content_base) {
-		    		$u1 = URI::URL->new_abs($location, $content_base);
+				$u1 = URI::URL->new_abs($location, $content_base);
 			} 
 			else {
-		    		$u1 = URI::URL->new_abs($location, $referer);
+				$u1 = URI::URL->new_abs($location, $referer);
 			}
 			&insert_url ($u1, $url, $nivel  - 1);
 		} # fim: Location
@@ -1607,10 +1580,10 @@ sub download {
 		$content_location = $res->header("Content-Location");
 		if ($content_location) {
 			if ($content_base) {
-		    		$u1 = URI::URL->new_abs($content_location, $content_base);
+				$u1 = URI::URL->new_abs($content_location, $content_base);
 			} 
 			else {
-		    		$u1 = URI::URL->new_abs($content_location, $referer);
+				$u1 = URI::URL->new_abs($content_location, $referer);
 			}
 			push @urls, $u1 if ($u1 ne $url) and ($u1 ne $new_url);
 		} # fim: Content-Location
@@ -1625,8 +1598,8 @@ sub download {
 			# make it the referer for our links
 			$url = $urls[-1];
 
-		    	$new_file_location = &make_filename($urls[-1]);
-		    	$new_file_location = "$BASE_DIR$new_file_location";
+			$new_file_location = &make_filename($urls[-1]);
+			$new_file_location = "$BASE_DIR$new_file_location";
 			print "  [ FILE-LOCATION: $new_file_location ]\n" if $VERBOSE;
 			&make_dir ($new_file_location);
 			if (-e $new_file_location) {
@@ -1642,8 +1615,8 @@ sub download {
 
 		@filenames = ($filename);
 		foreach (0 .. ($#urls - 1)) {
-		    	$new_file_location = &make_filename($urls[$_]);
-		    	$new_file_location = "$BASE_DIR$new_file_location";
+			$new_file_location = &make_filename($urls[$_]);
+			$new_file_location = "$BASE_DIR$new_file_location";
 			push @filenames, $new_file_location;
 			# print "  [ ALT-FILE-LOCATION: $urls[$_] => $new_file_location ]\n" if $VERBOSE;
 		}
@@ -1686,21 +1659,25 @@ sub download {
 
 		}
 
-		if ($Content_Type eq "text/html") {
-			print "  [ HTML: Content-Type: text/html ]\n" if $VERBOSE;
-			$mime_text_html = 1;
-		} else {
-			$mime_text_html = 0;
-		}
-
 
 DOWNLOAD_OK:
+
 	# arriving here from FILE: (cache) or from HTTP:
 
 	# haven't we run out of depth? and we don't need to read the file?
 	return if ($nivel < 1) and ! $MAKEREL;
 
 	# is it HTML or related?
+	$Content_Type = &get_file_attrib($filename, 'Content-Type') unless $Content_Type;
+	print "  [ Content-Type: $Content_Type ]\n" if $VERBOSE;
+
+	if ($Content_Type eq "text/html") {
+		print "  [ HTML: Content-Type: text/html ]\n" if $VERBOSE;
+		$mime_text_html = 1;
+	} else {
+		$mime_text_html = 0;
+	}
+
 	return if ! ($mime_text_html or ($filename =~ /\..?htm.?$/i));
 	return if eval "\$filename =~ $default_exclude";
 
@@ -1716,45 +1693,106 @@ DOWNLOAD_OK:
 	print "  [ CONTENTS <<\n$_\n    >> CONTENTS ]\n" if $VERBOSE;
 	my @links1 = ();
 
-	# help identifying delimiters
-	@tags = /(<.*?>)/g;
-	#print join("\n", @tags);
+	# identify main delimiters
+	# <xxx>
+	# <SCRIPT LANGUAGE="xxx"> xxx xxx xxx </SCRIPT>
 
-	foreach(@tags) {
+	@tags = /(<.*?>)/g;
+	@scripts = /(<SCRIPT.*?<\/SCRIPT>)/ig;
+	@forms = /(<FORM.*?<\/FORM>)/ig;
+
+
+# SCRIPTS
+
+	# <SCRIPT LANGUAGE="xxx"> xxx xxx xxx </SCRIPT>
+	# <SCRIPT LANGUAGE="JavaScript" SRC="js/dynlayer.js"></SCRIPT>
+
+
+
+# FORMS
+
+
+	foreach(@forms) {
+		# find out what to do with the form
+		# keywords:
+		#	ACTION="http://www.clicrbs.com.br/redirect.jsp" METHOD="get" 
+		# 	NAME="tab" VALUE="00001"
+		#	NAME="newsID" VALUE="0"
+		($form_action) = /ACTION\s{0,100}?=\s{0,100}?\"?(.{0,500}?)[">\s]/i;
+		$form_action = $url unless $form_action;
+		($form_method) = /METHOD\s{0,100}?=\s{0,100}?\"?(.{0,100}?)[">\s]/i;
+		$form_method = "GET" unless $form_method;
+		s/<FORM.*?>//;	# finished header
+		print "  [ FORM: METHOD: $form_method ]\n" if $VERBOSE;
+		print "  [ FORM: ACTION: $form_action ]\n" if $VERBOSE;
+		@form_names = /NAME\s{0,100}?=\s{0,100}?\"?(.{0,500}?>)/ig;
+		# print "  [ FORM: NAMES: ", join(" -- ", @form_names), " ]\n" if $VERBOSE;
+		@form_query = ();
+		foreach(@form_names) {
+			($item)  = /^(.*?)[">\s]/;
+			($value) = /VALUE\s{0,100}?=\s{0,100}?\"?(.{0,500}?)[">\s]/i or '';
+			print "  [ FORM: NAME: $item = $value ]\n" if $VERBOSE;
+			push @form_query, uri_escape($item) . "=" . uri_escape($value);
+		}
+
+		# create request
+		if ($form_method =~ /get/i) {
+			$form_request = $form_action . '?' . join("\&", @form_query);
+			print "  [ FORM: REQUEST: $form_request ]\n" if $VERBOSE;
+			# done. Save it.
+			push @links1, $form_request;
+		}
+		elsif ($form_method =~ /post/i) {
+			$form_request = $form_action . $POST_SEPARATOR . join("\&", @form_query);
+			print "  [ FORM: REQUEST: $form_request ]\n" if $VERBOSE;
+			# done. Save it.
+			push @links1, $form_request;
+		}
+		else {
+			print "  [ FORM: METHOD NOT IMPLEMENTED: $form_method ]\n" if $VERBOSE;
+		}
+	} # end forms
+
+
+# COLLECT LINKS FROM TAGS <...>
+
+	# print join("\n", @tags);
+
+	foreach(@tags, @scripts) {
 
 			# do not consider comments <! > unless they are javascript
 			# s/<!.*?>//;
 
 			# <BODY BACKGROUND="..
-			push @links1, /<.{0,100}?background\s{0,100}?=\s{0,100}?\"?(.{0,100}?)[">\s]/ig;
+			push @links1, /<.{0,100}?background\s{0,100}?=\s{0,100}?\"?(.{0,500}?)[">\s]/ig;
 		
 			# a href, area href, ref href, span href
-			push @links1, /<.{0,100}?href\s{0,100}?=\s{0,100}?\"?(.{0,100}?)[">\s]/ig;
+			push @links1, /<.{0,100}?href\s{0,100}?=\s{0,100}?\"?(.{0,500}?)[">\s]/ig;
 		
 			# image src, frame src, script src, embed src 
-			push @links1, /<.{0,100}?src\s{0,100}?=\s{0,100}?\"?(.{0,100}?)[">\s]/ig;
+			push @links1, /<.{0,100}?src\s{0,100}?=\s{0,100}?\"?(.{0,500}?)[">\s]/ig;
 		
 			# javascript: window.open
 			# window.open('http://www5.via-rs.com.br/mapa/mapa_n.php3','...
-			push @links1, /window\.open\s{0,100}?\(\s{0,100}?\'(.{0,100}?)\'/ig;
+			push @links1, /window\.open\s{0,100}?\(\s{0,100}?\'(.{0,500}?)\'/ig;
 
 			# javascript: jump()
 			#  JAVASCRIPT:jump(&quot;http://www.phy.ntnu.edu.tw/java/index.html&quot; )
-			push @links1, /&quot;(http\:\/\/.{0,100}?)&quot;/ig;
-			push @links1, /\"(http\:\/\/.{0,100}?)\"/ig;
-			push @links1, /\'(http\:\/\/.{0,100}?)\'/ig;
+			push @links1, /&quot;(http\:\/\/.{0,500}?)&quot;/ig;
+			push @links1, /\"(http\:\/\/.{0,500}?)\"/ig;
+			push @links1, /\'(http\:\/\/.{0,500}?)\'/ig;
 			# JAVESCRIPT:jump('color/color_e.html')
-			push @links1, /\"(.{0,100}?\.html)\"/ig;
-			push @links1, /\'(.{0,100}?\.html)\'/ig;
+			push @links1, /\"(.{0,500}?\.html)\"/ig;
+			push @links1, /\'(.{0,500}?\.html)\'/ig;
 
-			push @links1, /\"(.{0,100}?\.htm)\"/ig;
-			push @links1, /\'(.{0,100}?\.htm)\'/ig;
+			push @links1, /\"(.{0,500}?\.htm)\"/ig;
+			push @links1, /\'(.{0,500}?\.htm)\'/ig;
 
 			# java: <OPTION  VALUE="http://www.gruposinos.com.br/abc">	     
-			push @links1, /<option.*?value\s{0,100}?=\s{0,100}?\"?(http\:\/\/.{0,100}?)[">\s]/ig;
+			push @links1, /<option.*?value\s{0,100}?=\s{0,100}?\"?(http\:\/\/.{0,500}?)[">\s]/ig;
 		
 			# refresh
-			push @links1, /<meta.{10,20}?refresh.{10,20}?url=(.{0,100}?)[">\s]/ig;
+			push @links1, /<meta.{10,20}?refresh.{10,20}?url=(.{0,500}?)[">\s]/ig;
 
 			# span class -- correction: this is not java, it is css
 			# <span class="plntxt"> <b class="xxx">
@@ -1790,7 +1828,10 @@ DOWNLOAD_OK:
 				push @links1, $applet;
 				push @links1, $applet . ".class" if !  ($applet =~ /\.class$/);
 			} # applets
-	} # tags
+	} # end tags
+
+
+# VERIFY LINKS SYNTAX
 
 	# retira repeticoes e links invalidos
 	@links1 = sort @links1;
@@ -1802,7 +1843,7 @@ DOWNLOAD_OK:
 		$_  =~ s/#.*//;   # retira o fragmento antes de comparar
 		$_  =~ s/[';\{\}\[\]]//g;     # retira o lixo javascript antes de comparar
 		if ($_ ne $prev) {
-		    	$prev = $_;
+			$prev = $_;
 			if (    ($_) and
 				(! /^mailto:/i) and 
 				(! /^javascript:/i) and 
@@ -1810,6 +1851,7 @@ DOWNLOAD_OK:
 				(! /^javescript:/i) and 
 				(! /a href\=/i) and 
 				(! /\s/i) and 
+				(! /^.:/) and	# c:\
 				(! /^file:\/\//i)) {
 				# valid link
 				print "  [ LINK: $_ ]\n" if $VERBOSE;
@@ -1820,7 +1862,10 @@ DOWNLOAD_OK:
 			}
 		}
 		else { $_ = undef }
-	}
+	} # end verify links
+
+
+# PROCESS LINKS
 
 	# monta a estrutura @links = ($url, $referer,  $nivel, ...)
 	# filter links for MAKEREL
@@ -1828,13 +1873,30 @@ DOWNLOAD_OK:
 
 	$url_filename = &make_filename($url); 
 	$uri_filename = "file://" . $url_filename;
+	($method) = $url =~ /(.*?\/\/)/;
+	print "  [ URI-FILENAME: $uri_filename ]\n" if $VERBOSE;
 
 	$count = 0;
 	foreach (@links1) {
 		if ($_) {
 			$prev = $_;
+			$original = $_;
 
-			&insert_url ($_ . '', $url . '', $nivel  - 1);
+			unless ($downloaded) {
+				# this is a cache file. It might have some links to cache files instead of URL.
+				# if the link is to a cache file, it should be changed back to the original URL.
+				$cache_filename = URI::URL->new_abs($prev, $uri_filename);
+				if ($cache_filename =~ /file:\/\/(.*)/) {
+					$cache_filename = $1;
+					($parent, $cache_filename) = $cache_filename =~ /^(.*)\/(.*?)$/;
+					print "  [ CACHE-FILENAME: $BASE_DIR $parent $cache_filename ]\n" if $VERBOSE;
+					# do we know the original URL?
+					$prev = $method . &check_translation_url($cache_filename, "$BASE_DIR$parent");
+					print "  [ CACHE-URL-NAME: $prev ]\n" if $VERBOSE;
+				}
+			}
+
+			&insert_url ($prev . '', $url . '', $nivel  - 1);
 
 			if ($MAKEREL and $mime_text_html) {
 				# make links "local"
@@ -1853,16 +1915,19 @@ DOWNLOAD_OK:
 					$rel_filename = ("../" x $file_depth) . $new_filename;
 				}
 
-				$count+= $Full_Text =~ s/([=\"\s])\Q$prev\E([\"\s\>])/$1$rel_filename$2/g;
+				$count+= $Full_Text =~ s/([=\"\s])\Q$original\E([\"\s\>])/$1$rel_filename$2/g;
 				print "  [ REL: $count: $rel_filename -- $prev ]\n" if $VERBOSE;
 			}
 		}
 	}
 
+
+# SAVE "LOCAL" FILE
+
 	if ($count) {
 		print "  [ REL: COUNT $count << $Full_Text >> REL ]\n" if $VERBOSE;
 		# make backup
-		my_copy($filename, $filename . $BACKUP_SUFFIX);
+		my_copy($filename, $filename . $BACKUP_SUFFIX) if $MAKE_BACKUP;
 		# write file back to disk
 		$lm = (stat($filename))[9];	# keep last modification time
 		open (FILE, ">$filename"); 
@@ -1872,7 +1937,11 @@ DOWNLOAD_OK:
 		utime $lm, $lm, $filename if $lm;
 	}      
 
+
+# DONE DOWNLOAD
+
 } # end: download
+
 
 sub insert_url {
 	my ($url, $referer, $nivel) = @_;
@@ -1963,7 +2032,7 @@ sub push_list {
 	my ($arrayp, $url, $referer, $nivel) = @_;
 	my ($ini, $fim);
 	$ini_index = 0;					# begin of first record
-	$fim_index = $#$arrayp - $LIST_SIZE + 1; 	# begin of last record
+	$fim_index = $#$arrayp - $LIST_SIZE + 1;	# begin of last record
 	# testa o inicio e o final da lista, e depois o meio
 	while ($fim_index >= $ini_index) {
 		# print " $$arrayp=", $$arrayp[$index], "--", $$arrayp[$index+1], " ";
@@ -2074,10 +2143,10 @@ Other options: (to-be better explained)
                     to be used later
   --dump-max=N      (default is $DUMP_MAX) number of links per download-list file
   --invalid-char=C  (default is "$INVALID_CHAR")
-  --exclude=/REGEXP/i (default is "@EXCLUDE") Don't download matching URLs
+  --exclude=/REGEXP/x (default is "@EXCLUDE") Don't download matching URLs
                     Multiple --exclude are allowed
   --loop=REGEXP:INITIAL..FINAL (default is "$LOOP") (eg: xx:a,b,c  xx:'01'..'10')
-  --subst=s/REGEXP/VALUE/i (default is "$show_subst") (obs: "\" deve ser escrito "\\")
+  --subst=s/REGEXP/VALUE/x (default is "$show_subst") (obs: "\" deve ser escrito "\\")
   --404-retry       will retry on error 404 Not Found (default). 
   --no404-retry     creates an empty file on error 404 Not Found.
 EOT

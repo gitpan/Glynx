@@ -1,0 +1,214 @@
+=head1 NAME
+
+Glynx - a download manager. 
+
+=head1 DESCRIPTION
+
+Glynx makes a local image of a selected part of the internet.
+
+It can be used to make download lists to be used with other download managers, making
+a distributed download process.
+
+It currently supports resume/retry, referer, user-agent, frames, distributed
+download (see C<--slave>, C<--stop>, C<--restart>).
+
+It partially supports: redirect (using file-copy), java,
+javascript, multimedia, authentication (only basic), 
+mirror, translating links to local computer (C<--makerel>),
+correcting file extensions,
+ftp, renaming too long filenames and too deep directories,
+cookies, proxy, forms.
+
+A very basic cgi user interface is included.
+
+No testing so far: "https:".
+
+Tested on Linux and NT
+
+=head1 SYNOPSIS
+
+=over
+
+=item Do-everything at once:  
+
+ glynx.pl [options] <URL>
+
+
+=item Save work to finish later:   
+
+ glynx.pl [options] --dump="dump-file" <URL>
+
+
+=item Finish saved download:  
+
+ glynx.pl [options] "download-list-file"
+
+=item Network mode (client/slave)
+
+=item - Clients: 
+
+ glynx.pl [options] --dump="dump-file" <URL>
+
+
+=item - Slaves (will wait until there is something to do): 
+
+ glynx.pl [options] --slave
+
+=back
+
+=head1 HINTS
+
+How to create a default configuration:
+
+	Start the program with all command-line configurations, plus --cfg-save
+	or:
+	1 - start the program with --cfg-save
+	2 - edit glynx.ini file
+
+--subst, --exclude and --loop use regular expressions.
+
+   http://www.site.com/old.htm --subst=s/old/new/
+   downloads: http://www.acme.com/new.htm
+
+   - Note: the substitution string MUST be made of "valid URL" characters
+
+   --exclude=/\.gif/
+   will not download ".gif" files
+
+   - Note: Multiple --exclude are allowed:
+
+   --exclude=/gif/  --exclude=/jpeg/
+   will not download ".gif" or ".jpeg" files
+
+   It can also be written as:
+   --exclude=/\.gif|\.jp.?g/i
+   matching .gif, .GIF, .jpg, .jpeg, .JPG, .JPEG
+
+   --exclude=/www\.site\.com/
+   will not download links containing the site name
+
+   http://www.site.com/bin/index.htm --prefix=http://www.site.com/bin/
+   won't download outside from directory "/bin". Prefix must end with a slash "/".
+
+   http://www.site.com/index%%%.htm --loop=%%%:0..3
+   will download:
+     http://www.site.com/index0.htm
+     http://www.site.com/index1.htm
+     http://www.site.com/index2.htm
+     http://www.site.com/index3.htm
+
+   - Note: the substitution string MUST be made of "valid URL" characters
+
+- For multiple exclusion: use "|".
+
+- Don't read directory-index:
+
+	?D=D ?D=A ?S=D ?S=A ?M=D ?M=A ?N=D ?N=A =>  \?[DSMN]=[AD] 
+
+	To change default "exclude" pattern - put it in the configuration file
+
+Note: "File:" item in dump file is ignored
+
+You can filter the processing of a dump file using --prefix, --exclude, --subst
+
+If after finishing downloading you still have ".PART._BUSY_" files in the 
+base directory, rename them to ".PART" (the program should do this by itself)
+
+Don't do this: --depth=1 --out-depth=3 because "out-depth" is an upper limit; it 
+is tested after depth is generated. The right way is: --depth=4 --out-depth=3
+
+This will do nothing:
+
+ --dump=x graphic.gif
+
+because the dump file gets all binary files.
+
+Errors using https:
+
+ [ ERROR 501 Protocol scheme 'https' is not supported => LATER ] or
+ [ ERROR 501 Can't locate object method "new" via package "LWP::Protocol::https" => LATER ]
+
+This means you need to install at least "openssl" (http://www.openssl.org), Net::SSLeay and IO::Socket::SSL
+
+
+=head1 COMMAND-LINE OPTIONS
+
+Check --help for default values.
+
+Very basic:
+
+  --version         Print version number and quit
+  --verbose         More output
+  --quiet           No output
+  --help            Help page
+  --cfg-save        Save configuration to file
+  --base-dir=DIR    Place to load/save files
+
+Download options are:
+
+  --sleep=SECS      Sleep between gets, ie. go slowly
+  --prefix=PREFIX   Limit URLs to those which begin with PREFIX
+                    Multiple "--prefix" are allowed.
+  --depth=N         Maximum depth to traverse
+  --out-depth=N     Maximum depth to traverse outside of PREFIX
+  --referer=URI     Set initial referer header
+  --limit=N         A limit on the number documents to get
+  --retry=N         Maximum number of retrys
+  --timeout=SECS    Timeout value - increases on retrys
+  --agent=AGENT     User agent name
+  --mirror          Checks all existing files for updates
+  --nomirror        Do not check for updates -- if file exists, it's ok
+  --mediaext        Creates a file link, guessing the media type extension (.jpg, .gif)
+                    (perl actually makes a file copy)
+  --nomediaext      Do not try to change media type extension
+  --makerel         Make Relative links. Links in pages will work in the
+                    local computer.
+  --nomakerel       Keep links as they are. Do not try to change links.
+  --auth=USER:PASS  Set authentication credentials
+  --cookies=FILE    Set up a cookies file (default is no cookies)
+  --name-len-max    Limit filename size
+  --dir-depth-max   Limit directory depth
+
+Multi-process control:
+
+  --slave           Wait until a download-list file is created (be a slave)
+  --stop            Stop slave
+  --restart         Stop and restart slave
+
+Not implemented yet but won't generate fatal errors (compatibility with lwp-rget):
+
+  --hier            Download into hierarchy (not all files into cwd)
+  --iis             Workaround IIS 2.0 bug by sending "Accept: */*" MIME
+                    header; translates backslashes (\) to forward slashes (/)
+  --keepext=type    Keep file extension for MIME types (comma-separated list)
+  --nospace         Translate spaces URLs (not #fragments) to underscores (_)
+  --tolower         Translate all URLs to lowercase (useful with IIS servers)
+
+Other options: (to-be better explained)
+
+  --indexfile=FILE  Index file in a directory
+  --part-suffix=.SUFFIX  Extension to use for partial downloads 
+                    (example: ".Getright" ".PART")
+  --dump=FILE       make download-list file, to be used later
+  --dump-max=N      number of links per download-list file 
+  --invalid-char=C  Character to use in substitutions for invalid characters
+  --exclude=/REGEXP/i  Don't download matching URLs
+                    Multiple --exclude are allowed
+  --loop=REGEXP:INITIAL..FINAL  Expand a URL through substitutions 
+                    (example: xx:a,b,c  xx:'01'..'10')
+  --subst=s/REGEXP/VALUE/i  Substitute some string in the urls.
+  --404-retry       will retry on error 404 Not Found. 
+  --no404-retry     creates an empty file on error 404 Not Found.
+
+
+=head1 COPYRIGHT
+
+Copyright (c) 2000 Flavio Glock <fglock@pucrs.br>. All rights reserved.
+This program is free software; you can redistribute it and/or
+modify it under the same terms as Perl itself.
+This program was based on examples in the Perl distribution.
+
+
+If you use it/like it, send a postcard to the author. 
+
+=cut
