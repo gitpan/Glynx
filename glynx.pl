@@ -12,8 +12,9 @@ use Getopt::Long;
 use LWP::UserAgent;
 use URI::URL;
 use URI::Heuristic 	qw(uf_uristr);
+use LWP::MediaTypes 	qw(media_suffix);
 
-my $VERSION = "1.022";
+my $VERSION = "1.023";
 
 
 =head1 NAME
@@ -32,9 +33,9 @@ a distributed download process.
 It currently supports resume, retry, referer, user-agent, java, frames, distributed
 download (see C<--slave>, C<--stop>, C<--restart>).
 
-It partially supports redirect, javascript, multimedia, authentication
+It partially supports redirect, javascript, multimedia, authentication, mirror
 
-It does not support mirroring (checking file dates), forms
+It does not support forms
 
 It has not been tested with "https" yet.
 
@@ -171,6 +172,9 @@ Download options are:
   --retry=N         Maximum number of retrys (default is $RETRY_MAX)
   --timeout=SECS    Timeout value - increases on retrys (default is $TIMEOUT)
   --agent=AGENT     User agent name (default is "$AGENT")
+  --mirror          Checks all existing files for updates (default is --nomirror)
+  --mediaext        Creates a file link, guessing the media type extension (.jpg, .gif)
+                    (Windows perl makes a file copy) (default is --nomediaext)
 
 Multi-process control:
 
@@ -278,6 +282,16 @@ Problems (not bugs):
 To-do (long list):
 
 	Bugs/debug/testing:
+		- test: timeout changes after "slave"
+ 		- test: counting MAX_DOCS with retry
+ 		- test: base-dir, out-depth, site leakage
+		- test: authentication
+		- test: redirect 3xx
+			usar: www.ig.com.br ?
+
+		- perl "link" is copying instead of linking, even on linux
+		- 401 - auth required -- supply name:pass
+		- implement "If-Range:"
 		- put // on exclude, etc if they don't have
 		- arrays for $LOOP,$SUBST; accept multiple URL
 		- Doesn't recreate unix links on "ftp". 
@@ -295,13 +309,7 @@ To-do (long list):
 		  option: touch busy file to show activity
 		- don't ignore "File:" 
 		- unknown protocol is a fatal error
- 		- test: counting MAX_DOCS with retry
- 		- test: base-dir, out-depth, site leakage
-		- test: authentication
-		- test: redirect 3xx
-			usar: www.ig.com.br ?
 		- change the retry loop to a "while"
-		- timeout changes after "slave"
 		- leitura da configuracao:
 		  (1) le opcoes da linha de comando (pode trocar o arquivo .ini), 
 		  (2) le configuracao .ini, 
@@ -311,14 +319,12 @@ To-do (long list):
 		- execute/override download-list-file "File:"
 		  opcao: usar --subst=/k:\\temp/c:\\download/
 	Generalization, user-interface:
-		- opcao no-download para reprocessar o cache
 		- arquivo de log opcional para guardar os headers. 
 		  Opcao: filename._HEADER_; --log-headers
 		- make it a Perl module (crawler, robot?), generic, re-usable 
 		- option to understand robot-rules
 		- make .glynx the default suffix for everything
 		- try to support <form> through download-list-file
-		- support mirroring (checking file dates)
 		- internal small javascript interpreter
 		- perl/tk front-end; finish web front end
 		- config comment-string in download-list-file
@@ -359,8 +365,7 @@ To-do (long list):
  		- gravar arquivo "to-do" durante o processamento, 
 		para poder retomar em caso de interrupcao.
    		ex: a cada 10 minutos
- 		- integrar com "k:\download"
-		- receber / enviar comando restart / stop.
+ 		- Redo Web front-end
 	Speed optimizations:
 		- use an optional database connection
 		- Persistent connections;
@@ -406,6 +411,12 @@ To-do (long list):
 
 
 Version history:
+
+ 1.023:
+	- better redirect, but perl "link" is copying instead of linking
+	- --mirror option (304)
+	- --mediaext option
+	- sets file dates to last-modified
 
  1.022:
 	- multiple --prefix and --exclude seems to be working
@@ -547,6 +558,8 @@ If you use it/like it, send a postcard to the author.
 @Config_Arrays = qw/PREFIX EXCLUDE/;
 
 # Defaults
+$MIRROR =	0;
+$MEDIAEXT =	0;
 $DEPTH = 	0;
 $TIMEOUT = 	30;
 $AGENT = 	"Mozilla/3.0 (WinNT; I)";
@@ -607,6 +620,8 @@ $progname =~ s/\.\w*$//; 	# strip extension if any
 
 &read_dump ($CFG_FILE);
 &get_options;
+&preprocess_options;
+
 &save_Config (\%Main_Config);
 &show_Config (\%Main_Config) if $VERBOSE;
 
@@ -641,6 +656,8 @@ sub get_options {
 	'quiet!'   	=> \$QUIET,
 	'restart!'	=> \$RESTART,
 	'stop!'		=> \$STOP,
+	'mirror!'	=> \$MIRROR,
+	'mediaext!'	=> \$MEDIAEXT,
 
 	# not implemented, but exist in lwp-rget:
 	'hier'     	=> \&not_implemented('hier'),
@@ -650,6 +667,14 @@ sub get_options {
 	'nospace'  	=> \&not_implemented('nospace'),
 	'keepext=s' 	=> \&not_implemented('keepext'),
     ) || usage();
+
+}
+
+sub preprocess_options {
+	$BASE_DIR = "." if ! $BASE_DIR;
+	$BASE_DIR =~ s/\\/\//g;
+	$BASE_DIR .= "/" if ! ($BASE_DIR =~ /\/$/);
+	print "  [ BASE_DIR: $BASE_DIR ]\n" if $VERBOSE;
 
 	@loop = split(":",$LOOP);
 }
@@ -720,11 +745,6 @@ sub my_main {
 	$ua = LWP::UserAgent->new;
 	$ua->agent($AGENT);
 	$ua->timeout($TIMEOUT);
-
-	$BASE_DIR = "." if ! $BASE_DIR;
-	$BASE_DIR =~ s/\\/\//g;
-	$BASE_DIR .= "/" if ! ($BASE_DIR =~ /\/$/);
-	print "  [ BASE_DIR: $BASE_DIR ]\n" if $VERBOSE;
 
 	# estrutura de @links = ($url, $referer, $nivel, ...)
 	@links = ();		# coleta links para serem visitados ($url, $referer, $nivel, ...)
@@ -889,9 +909,10 @@ SLAVE_IDLE:
 	$dir_expr = "$BASE_DIR";
 	opendir DIR, $dir_expr or die "  [ SLAVE: CAN'T OPEN $dir_expr ]\n";
     		@dir =  readdir(DIR); 	
-		@dir = grep { /$DUMP_SUFFIX$/ && -f "$BASE_DIR$_" } @dir;
+		print "  [ SLAVE: DIR: $BASE_DIR -- ", join(',',@dir), " ]\n" if $VERBOSE;
+		@dir = grep { (/$DUMP_SUFFIX$/) and (-f "$BASE_DIR$_") } @dir;
 	closedir DIR;
-	print "  [ SLAVE: $dir_expr: ", join(',',@dir), " ]\n" if $VERBOSE;
+	print "  [ SLAVE: $dir_expr: $DUMP_SUFFIX -- ", join(',',@dir), " ]\n" if $VERBOSE;
 	$dir_index = 0;
     SLAVE_TEST_DIR:
 	while ($#dir >= $dir_index) {
@@ -1279,6 +1300,10 @@ sub make_dir {
 
 sub my_unlink {
  	my ($source) = @_;
+	if (-d $source) {
+		print "  [ ERR: WILL NOT UNLINK DIRECTORY ]\n"; 
+		return; 
+	}
 	if (-e $source) {
 		unlink $source   or print "  [ ERR: UNLINK $source - $^E ]\n";  
 	}
@@ -1299,6 +1324,10 @@ sub my_copy {
 		print "  [ COPY: CAN'T FIND $source ]\n";
 		return;
 	}
+	if (-d $source) {
+		print "  [ COPY: CAN'T COPY DIRECTORY ]\n";
+		return;
+	}
 	&my_unlink ($dest);
 	print "  [ COPY: $source, $dest ]\n" if $VERBOSE;
 	open (FILE1, $source)  or print "  [ ERR: CAN'T READ $source - $^E ]\n"; 
@@ -1311,10 +1340,17 @@ sub my_copy {
 		}
 	close (FILE2);
 	close (FILE1);
+
+	# (adapted from: UserAgent.pm)
+	if (my $lm = (stat($source))[9] ) {
+		# make sure the file has the same last modification time
+		utime $lm, $lm, $dest;
+	}
 }
 
 sub my_rename {
  	my ($source, $dest) = @_;
+	return if $source eq $dest;
 	unless (-e $source) {
 		print "  [ RENAME: CAN'T FIND $source ]\n";
 		return;
@@ -1414,6 +1450,8 @@ sub download_callback {
 	#print "  [ RESPONSE->HEADER = ", $response->as_string, " ] \n";
 }
 
+
+
 sub download {
 	my ($url, $referer, $nivel) = @_;
 	$mime_text_html = 0;
@@ -1446,16 +1484,22 @@ sub download {
 		return;
 	}
 
+	$mtime = 0;
 	if (-e $filename) {
 		if (-d $filename) {
 			print "  [ DIR EXISTS: $filename ]\n" if $VERBOSE;
 			$filename .= '/' . $INDEXFILE;
 			print "    [ CREATE FILE: $filename ]\n" if $VERBOSE;
-			goto download_ok if (-s $filename);
+			unless ($MIRROR) { 
+				goto download_ok if (-s $filename);
+			}
 		} elsif (-s $filename) {
 			print "  [ FILE EXISTS: $filename ]\n" if $VERBOSE;
-			goto download_ok;
+			unless ($MIRROR) { 
+				goto download_ok;
+			}
 		}
+		$mtime = (stat($filename))[9];
 	}
 
 	&make_dir($name);
@@ -1477,6 +1521,10 @@ sub download {
 	$req->referer($referer . '');
 	# declare preference for "html" directory listings, if "ftp"
 	$req->header('Accept' => 'text/html;q=1.0,*/*;q=0.6');
+	if ($mtime) {
+		print "  [ If-Modified-Since: ", HTTP::Date::time2str($mtime), " ]\n" if $VERBOSE;
+		$req->header('If-Modified-Since' => HTTP::Date::time2str($mtime));
+	}
 
 	$download_success = 1;
 
@@ -1529,12 +1577,11 @@ sub download {
 	if ($download_success and $res->is_success) {
 		print "  [ OK: ", $res->status_line, " ]\n" if $VERBOSE;
 		&my_rename ("$filename$PART_SUFFIX", "$filename");
-
-		print "  [ GET: SUCCESS: UNLINK $filename$PART_SUFFIX-1 ]\n" if $VERBOSE;
 		&my_unlink ("$filename$PART_SUFFIX-1");
 
 		$num_docs++;
 
+		print "  [ RESPONSE <<\n", $res->as_string, "    >> RESPONSE ]\n" if $VERBOSE;
 		#HTTP/1.1 200 OK
 		#Connection: close
 		#Date: Sat, 23 Sep 2000 08:52:22 GMT
@@ -1546,7 +1593,151 @@ sub download {
 		#Content-Length: 74623
 		#Last-Modified: Mon, 17 Apr 2000 18:13:11 GMT
 
-		print "  [ RESPONSE <<\n", $res->as_string, "    >> RESPONSE ]\n" if $VERBOSE;
+		# (from: UserAgent.pm)
+		if (my $lm = $res->last_modified) {
+			# make sure the file has the same last modification time
+			utime $lm, $lm, $filename;
+		}
+
+		# REDIRECT:
+		#     Location:         indica que um novo documento deve ser obtido
+		#     Content-Location: indica o lugar onde este documento esta armazenado
+		#     Content-Base:     indica o diretorio onde este documento esta armazenado
+		#     $res->base        guess directory location
+
+		@urls = ($url);		# store the url variants
+		print "  [     URL: $url ]\n";
+
+		# create a root-relative url name for relocating ( /... )
+		#$url_object = URI::URL->new($url);
+
+		#$relative_url = $url_object->path . " " . 
+		#		$url_object->params . " " . 
+		#		$url_object->query;
+		#print "  [ RELATIVE-URL: $relative_url ]\n";
+
+		$content_base = $res->header("Content-Base");
+		unless ($content_base) {
+			# try to guess base
+			$base = $res->base;
+			$u1 = 	URI::URL->new_abs($base,$url);
+			$base = $u1;
+			$base =~ s/\?.*//;  # remove query
+			print "  [ BASE_PATH: $base ]\n" if $VERBOSE;
+			$res->header( 'Content_Base' => "$base");   
+			$content_base = $res->header("Content-Base");
+		}
+		#if ($content_base) {
+		#	$dir_base = &make_filename($content_base);
+		#	&make_dir($dir_base);  			     # should do this LATER!
+		#}
+
+		# check if url directory changed
+		#$base_filename = &make_filename($base);
+
+		# find out file name with query, without directory
+		$u1 = 		URI::URL->new($url);
+		$path =		$u1->path;
+		$path =~ 	s|^(.*)\/||g;   # remove directory
+		#($url_base) =	$u1 =~ /(.*)$path/;
+		#print "  [ GET PATH: $url_base $path ]\n" if $VERBOSE;
+
+		$url_no_query = $url;
+		$url_no_query =~ s/\?.*//;
+
+		$path1 = $path;
+		$path2 = '';
+		$path1 .= '?' . $u1->query if $u1->query;
+		$path2 .= '?' . $u1->query if $u1->query;
+
+		#print "  [ PATH 1:  $content_base$path1 ]\n" if $VERBOSE;
+		#print "  [ PATH 2:  $content_base$path2 ]\n" if $VERBOSE;
+
+		if ($content_base eq ($url_no_query . "/")) {
+			$new_url = "$content_base$path2";
+		}
+		else {
+			$new_url = "$content_base$path2";
+		}
+		print "  [ NEW URL:  $new_url ]\n" if $VERBOSE and ($new_url ne $url);
+		push @urls, $new_url if $new_url ne $url;
+
+		$location = $res->header("Location");
+		if ($location) {
+			if ($content_base) {
+		    		$u1 = URI::URL->new_abs($location, $content_base);
+			} 
+			else {
+		    		$u1 = URI::URL->new_abs($location, $referer);
+			}
+			&insert_url ($u1, $url, $nivel  - 1);
+		} # fim: Location
+
+		$content_location = $res->header("Content-Location");
+		if ($content_location) {
+			if ($content_base) {
+		    		$u1 = URI::URL->new_abs($content_location, $content_base);
+			} 
+			else {
+		    		$u1 = URI::URL->new_abs($content_location, $referer);
+			}
+			push @urls, $u1 if ($u1 ne $url) and ($u1 ne $new_url);
+		} # fim: Content-Location
+
+
+		# SAVE REDIRECT
+
+		if ($#urls > 0) {
+			# more than 1 filename option
+			print "  [ REDIRECT: ", join(",", @urls), " ]\n" if $VERBOSE;
+			# last option is probably better
+			# make it the referer for our links
+			$url = $urls[-1];
+
+		    	$new_file_location = &make_filename($urls[-1]);
+		    	$new_file_location = "$BASE_DIR$new_file_location";
+			print "  [ FILE-LOCATION: $new_file_location ]\n" if $VERBOSE;
+			&make_dir ($new_file_location);
+			if (-e $new_file_location) {
+				print "  [ FILE-LOCATION: EXISTS ]\n" if $VERBOSE;
+			}
+			else {
+				&my_rename($filename, $new_file_location);
+			}
+			$filename = $new_file_location;
+		}
+
+		# MAKE ALTERNATE FILENAMES
+
+		@filenames = ($filename);
+		foreach (0 .. ($#urls - 1)) {
+		    	$new_file_location = &make_filename($urls[$_]);
+		    	$new_file_location = "$BASE_DIR$new_file_location";
+			push @filenames, $new_file_location;
+			# print "  [ ALT-FILE-LOCATION: $urls[$_] => $new_file_location ]\n" if $VERBOSE;
+		}
+
+		# CHECK SUFFIX (JPG/GIF/HTM)
+		# $suffix = "";
+		if ($MEDIAEXT and ($content_type = $res->content_type)) {
+			@suffix = media_suffix($content_type);
+			print "  [ Content-Type: $content_type = @suffix ]\n" if $VERBOSE;
+			unless (grep { $filename =~ /\.$_$/i } @suffix) {
+				print "  [ WARNING: Missing Suffix: $filename ]\n" if $VERBOSE;
+				$suffix = @suffix[0];
+				push @filenames, $filename . "." . $suffix;
+			}
+		}
+
+		# link other names to main name
+
+		foreach (0 .. $#filenames) {
+			# note: link will COPY files on Windows
+			print "  [ ALT-FILE-LOCATION: $filenames[$_] ]\n" if $VERBOSE;
+			link $filename, $filenames[$_] unless -e $filenames[$_];
+		}
+
+		# BEGIN CHECKING CONTENT
 
 		if ($res->content_type eq "text/ftp-dir-listing") {
 			print "  [ FTP-DIR: Content-Type: text/ftp-dir-listing ]\n" if $VERBOSE;
@@ -1572,88 +1763,8 @@ sub download {
 			$mime_text_html = 0;
 		}
 
-		# REDIRECIONAMENTOS:
-		# Location: indica que um novo documento deve ser obtido
-		# Content-Location: indica o lugar onde este documento esta armazenado
-		# Content-Base: indica o diretorio onde este documento esta armazenado
-
-		$content_base = $res->header("Content-Base");
-		if ($content_base) {
-			$dir_base = &make_filename($content_base);
-			&make_dir($dir_base);
-		}
-
-		$location = $res->header("Location");
-		if ($location) {
-			if ($content_base) {
-		    		$u1 = URI::URL->new_abs($location, $content_base);
-			} 
-			else {
-		    		$u1 = URI::URL->new_abs($location, $referer);
-			}
-			&insert_url ($u1, $url, $nivel  - 1);
-		} # fim: Location
-
-		$content_location = $res->header("Content-Location");
-		if ($content_location) {
-			if ($content_base) {
-		    		$u1 = URI::URL->new_abs($content_location, $content_base);
-			} 
-			else {
-		    		$u1 = URI::URL->new_abs($content_location, $referer);
-			}
-		    	$file_location = &make_filename($u1);
-		    	$file_location = "$BASE_DIR$file_location";
-		    	if ($filename ne $file_location) {
-				# cria uma copia no lugar indicado
-				$dest = $file_location;
-				if (-d $file_location) {
-					$dest = $file_location . '/' . $INDEXFILE;
-					print "  [ Dir: $dest ]\n" if $VERBOSE;
-				}
-				if  (-e $dest) {
-					print "  [ Arquivo ja existe: $file_location ]\n" if $VERBOSE;
-				}  
-				else {
-					# verifica se existe o diretorio de destino
-					&make_dir($dest);
-					# copia
-					$temp = $filename;
-					$temp = $filename . '/' . $INDEXFILE if -d $filename;
-					# print "  [ COPY $temp, $dest ]\n" if $VERBOSE;
-					&my_copy($temp, $dest);
-				}
-			}
-		} # fim: Content-Location
-
-		# confere se esta no diretorio certo
-		$base = $res->base;
-		#$base_filename = &make_filename($base);
-		#print " > BASE:      $base\n";
-		#print " > BASE_FILE: $BASE_DIR$base_filename\n";
-		#print " > URL:       $url\n";
-		#print " > FILE:      $filename\n";
-		# retirar o nome de arquivo da url e ver a diferenca com a nova base:
-		$u1 = 		URI::URL->new($base);
-		$base_path =	$u1->path;
-		$base_path =~ 	s/[\w\.]*$//g;
-		print "  [ BASE_PATH: $base_path ]\n" if $VERBOSE;
-		$u1 = 		URI::URL->new($url);
-		$path =		$u1->path;
-		$path =~ 	s/[\w\.]*$//g;
-		print "  [ URL_PATH:  $path ]\n" if $VERBOSE;
-		#$url =~ /\/[\w]*/;
-		if ($path ne $base_path) {
-			print "  [ REDIRECT: Trocar referer do diretorio $path para $base_path ]\n" if $VERBOSE;
-			$url =~ s/(.*)$path/$1$base_path/;
-			print "  [ URL_NOVA:  $url]\n" if $VERBOSE;
-			# o filename nao precisa ser mudado!
-		}
 
 download_ok:
-
-	#$teste = eval "\$filename =~ $default_exclude";
-	#print " ++ teste [$teste] $filename\n";
 
 		if (    (($nivel - 1) >= 0) and
 			( $mime_text_html or
@@ -1765,8 +1876,11 @@ download_ok:
 	} else {
 		print "  [ RESPONSE: ERROR <<\n", $res->as_string, "    >> RESPONSE ]\n" if $VERBOSE;
 		$msg = $res->status_line;
-		if (($msg =~ /404/) and (! $RETRY_404)) {
-			print "    [ ERROR $msg => CANCEL ]\n" unless $QUIET;
+		if ($msg =~ /304/) {
+			print "  [ OK: 304 NOT MODIFIED ]\n" unless $QUIET;
+		}
+		elsif (($msg =~ /404/) and (! $RETRY_404)) {
+			print "  [ ERROR $msg => CANCEL ]\n" unless $QUIET;
 			# cria arquivo not-found
 			if (-e "$filename$PART_SUFFIX") {
 				&my_rename ("$filename$PART_SUFFIX", "$filename$NOT_FOUND_SUFFIX");
@@ -1961,6 +2075,9 @@ Download options are:
   --retry=N         Maximum number of retrys (default is $RETRY_MAX)
   --timeout=SECS    Timeout value - increases on retrys (default is $TIMEOUT)
   --agent=AGENT     User agent name (default is "$AGENT")
+  --mirror          Checks all existing files for updates (default is --nomirror)
+  --mediaext        Creates a file link, guessing the media type extension (.jpg, .gif)
+                    (Windows perl makes a file copy) (default is --nomediaext)
 
 Multi-process control:
   --slave           Wait until a download-list file is created (be a slave)

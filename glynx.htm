@@ -47,10 +47,11 @@ It currently supports resume, retry, referer, user-agent, java, frames,
 distributed download (see <CODE>--slave</CODE>, <CODE>--stop</CODE>, <CODE>--restart</CODE>).
 
 <P>
-It partially supports redirect, javascript, multimedia, authentication
+It partially supports redirect, javascript, multimedia, authentication,
+mirror
 
 <P>
-It does not support mirroring (checking file dates), forms
+It does not support forms
 
 <P>
 It has not been tested with ``https'' yet.
@@ -221,6 +222,9 @@ Download options are:
   --retry=N         Maximum number of retrys (default is $RETRY_MAX)
   --timeout=SECS    Timeout value - increases on retrys (default is $TIMEOUT)
   --agent=AGENT     User agent name (default is &quot;$AGENT&quot;)
+  --mirror          Checks all existing files for updates (default is --nomirror)
+  --mediaext        Creates a file link, guessing the media type extension (.jpg, .gif)
+                    (Windows perl makes a file copy) (default is --nomediaext)
 </PRE>
 <P>
 Multi-process control:
@@ -353,6 +357,17 @@ To-do (long list):
 
 <P>
 <PRE>        Bugs/debug/testing:
+                - test: timeout changes after &quot;slave&quot;
+                - test: counting MAX_DOCS with retry
+                - test: base-dir, out-depth, site leakage
+                - test: authentication
+                - test: redirect 3xx
+                        usar: www.ig.com.br ?
+</PRE>
+<P>
+<PRE>                - perl &quot;link&quot; is copying instead of linking, even on linux
+                - 401 - auth required -- supply name:pass
+                - implement &quot;If-Range:&quot;
                 - put // on exclude, etc if they don't have
                 - arrays for $LOOP,$SUBST; accept multiple URL
                 - Doesn't recreate unix links on &quot;ftp&quot;. 
@@ -370,13 +385,7 @@ To-do (long list):
                   option: touch busy file to show activity
                 - don't ignore &quot;<A HREF="File:&quot">File:&quot</A>; 
                 - unknown protocol is a fatal error
-                - test: counting MAX_DOCS with retry
-                - test: base-dir, out-depth, site leakage
-                - test: authentication
-                - test: redirect 3xx
-                        usar: www.ig.com.br ?
                 - change the retry loop to a &quot;while&quot;
-                - timeout changes after &quot;slave&quot;
                 - leitura da configuracao:
                   (1) le opcoes da linha de comando (pode trocar o arquivo .ini), 
                   (2) le configuracao .ini, 
@@ -386,14 +395,12 @@ To-do (long list):
                 - execute/override download-list-file &quot;<A HREF="File:&quot">File:&quot</A>;
                   opcao: usar --subst=/k:\\temp/c:\\download/
         Generalization, user-interface:
-                - opcao no-download para reprocessar o cache
                 - arquivo de log opcional para guardar os headers. 
                   Opcao: filename._HEADER_; --log-headers
                 - make it a Perl module (crawler, robot?), generic, re-usable 
                 - option to understand robot-rules
                 - make .glynx the default suffix for everything
                 - try to support &lt;form&gt; through download-list-file
-                - support mirroring (checking file dates)
                 - internal small javascript interpreter
                 - perl/tk front-end; finish web front end
                 - config comment-string in download-list-file
@@ -434,8 +441,7 @@ To-do (long list):
                 - gravar arquivo &quot;to-do&quot; durante o processamento, 
                 para poder retomar em caso de interrupcao.
                 ex: a cada 10 minutos
-                - integrar com &quot;k:\download&quot;
-                - receber / enviar comando restart / stop.
+                - Redo Web front-end
         Speed optimizations:
                 - use an optional database connection
                 - Persistent connections;
@@ -482,6 +488,13 @@ To-do (long list):
 <P>
 Version history:
 
+<P>
+<PRE> 1.023:
+        - better redirect, but perl &quot;link&quot; is copying instead of linking
+        - --mirror option (304)
+        - --mediaext option
+        - sets file dates to last-modified
+</PRE>
 <P>
 <PRE> 1.022:
         - multiple --prefix and --exclude seems to be working
