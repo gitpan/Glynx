@@ -1,0 +1,138 @@
+Glynx - a download manager. 
+
+Version history:
+
+ 1.024:
+	new options:
+  	--name-len-max=   Limit filename size
+  	--dir-depth-max=  Limit directory depth
+	--cookies=FILE
+	--auth=
+	--makerel         Make relative links
+
+	- makerel will make relative links to other sites; 
+	will process last depth; 
+	save modified page and make a backup of the original page.
+	- better error handling on command line url "protocol error"
+	- use env_proxy
+	- my_link started
+	- $RETRY_TIMEOUT_MULTIPLIER set to 2
+
+
+ 1.023:
+	- better redirect, but perl "link" is copying instead of linking
+	- --mirror option (304)
+	- --mediaext option
+	- sets file dates to last-modified
+
+
+ 1.022:
+	- multiple --prefix and --exclude seems to be working
+	- uses Accept:text/html to ask for an html listing of the directory when in "ftp" mode.
+	- corrected errors creating directory and copying file on linux
+
+
+ 1.021:
+	- uses URI::Heuristic on command-line URL
+	- shows error response headers (if verbose)
+	- look at the 3rd parameter on 206 (when available -- otherwise it gives 500),
+			Content-Length: 637055		--> if "206" this is "chunk" size
+			Content-Range: bytes 1449076-2086130/2086131 --> THIS is file size
+	- prefix of: http://rd.yahoo.com/footer/?http://travel.yahoo.com/
+  	  should be: http://rd.yahoo.com/footer/
+	- included: "wav"
+	- sleep had 1 extra second
+	- sleep makes tests even when sleep==0
+
+
+ 1.020: oct-02-2000
+	- optimization: accepts 200, when expecting 206
+	- don't keep retrying when there is nothing to do
+	- 404 Not Found error sometimes means "can't connect" - uses "--404-retry"
+	- file read = binmode
+
+
+ 1.019: - restart if program was modified (-M $0)
+	- include "mov"
+	- stop, restart
+
+
+ 1.018: - better copy, rename and unlink
+	- corrected binary dump when slave
+	- comparacao de tamanho de arquivos corrigida
+ 	- span e' um comando de css, que funciona como "a" (a href == span href);
+	  span class is not java
+
+
+ 1.017: - sleep prints dots if verbose.
+	- daemon mode (--slave)
+	- url and input file are optional
+
+
+ 1.016: sept-27-2000
+	- new name "glynx.pl"
+	- verbose/quiet
+	- exponential timeout on retry
+	- storage control is a bit more efficient
+	- you can filter the processing of a dump file using prefix, exclude, subst
+	- more things in english, lots of new "to-do"; "goals" section
+	- rename config file to glynx.ini
+
+
+ 1.015: - first published version, under name "get.pl"
+	- rotina unica de push/shift sem repeticao
+	- traduzido parcialmente para ingles, revisao das mensagens
+
+
+ 1.014: - verifica inside antes de incluir o link
+ 	- corrige numeracao dos arquivos dump
+ 	- header "Location", "Content-Base"
+	- revisado "Content-Location"
+
+
+ 1.013: - para otimizar: retirar repeticoes dentro da pagina
+	- incluido "png"
+	- cria/testa arquivo "not-found"
+	- processa Content-Location - TESTAR - achar um site que use
+	- incluido tipo "swf", "dcr" (shockwave) e "css" (style sheet)
+ 	- corrige http://host/../file gravado em ./host/../file => ./file
+ 	- retira caracteres estranhos vindos do javascript: ' ;
+	- os retrys pendentes sao gravados somente no final.
+	- (1) le opcoes, (2) le configuracao, (3) le opcoes de novo
+
+
+ 1.012: - segmenta o arquivo dump durante o processamento, permitindo iniciar o
+	download em paralelo a partir de outro processo/computador antes que a tarefa esteja
+	totalmente terminada
+	- utiliza indice para gravar o dump; nao destroi a lista que esta na memoria.
+	- salva a configuracao completa junto com o dump; 
+	- salva/le get.ini
+
+
+ 1.011: corrige autenticacao (prefix)
+	corrige dump
+	le dump
+	salva/le $OUT_DEPTH, depth (individual), prefix no arquivo dump
+
+
+ 1.010: resume
+	se o site nao tem resume, tenta de novo e escolhe o melhor resultado (ideia do Silvio)
+
+
+ 1.009: 404 not found nao enviado para o dump
+       processa arquivo se o tipo mime for text/html (nao funciona para o cache)
+       muda o referer dos links dependendo da base da resposta (redirect)
+       considera arquivos de tamanho zero como "nao no cache"
+       gera nome _INDEX_.HTM quando o final da URL tem "/". 
+
+
+ 1.008: trabalha internamente com URL absolutas
+       corrige vazamento quando out-nivel=0
+
+
+ 1.007: segmenta o arquivo dump 
+       acelera a procura em @processed
+       corrige o nome do diretorio no arquivo dump
+
+-----------------
+

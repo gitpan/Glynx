@@ -1,0 +1,64 @@
+Glynx - a download manager. 
+
+INSTALLATION
+
+    Windows:
+	- unzip to a directory, such as c:\glynx or c:\temp
+	- this is a command prompt script, it will not work properly 
+	if you double click it.
+	However, you can put it in the startup directory in "slave mode" 
+	making a link with the --slave parameter. 
+	Then open another command prompt window to operate it as a client. 
+	- the latest ActivePerl has all the modules needed, 
+	except for "https://".
+
+    Unix/Linux:
+
+	tar -xzf Glynx-[version].tar.gz
+
+	- under RedHat 6.2 I had to upgrade or install these modules:
+	HTML::Tagset MIME:Base64 URI HTML::Parser Digest::MD5 libnet
+	libwww-perl
+
+	- to use https you will need:
+	openssl (www.openssl.org) Net::SSLeay IO::Socket::SSL
+
+    Please note that the software will create MANY files in 
+    its work directory, so it is advisable to have a dedicated 
+    sub-directory for it.
+
+
+How do I run Glynx?
+
+Before you run Glynx, you should be connected to
+the Internet. 
+
+If your Internet connection is via a
+firewall or proxy, you should set the
+environment variable 'HTTP_proxy' to the name
+of this proxy server. If your proxy server
+requires a username and password, the
+environment variables 'HTTP_proxy_user' and
+'HTTP_proxy_pass' should be set to these
+values.
+
+Glynx can then be run by typing 'perl glynx.pl [options] http://...' 
+in a command prompt or terminal window.
+
+
+How to create a default configuration:
+
+	Start the program with your command-line options, plus --cfg-save
+	or:
+ 	Start the program with --cfg-save, then edit glynx.ini file.
+
+
+COPYRIGHT
+
+Copyright (c) 2000 Flavio Glock <fglock@pucrs.br>. All rights reserved.
+This program is free software; you can redistribute it and/or
+modify it under the same terms as Perl itself.
+This program was based on examples in the Perl distribution.
+
+-----------
+

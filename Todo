@@ -1,0 +1,242 @@
+Glynx - a download manager. 
+
+TO-DO (short)
+
+	- More command-line compatibility with lwp-rget
+	- Graphical user interface
+
+Goals:
+
+	generalize 
+		option to use (external) java and other script languages to extract links
+		configurable file names and suffixes, filesystem limits
+		configurable dump file format
+		plugins
+		more protocols; download streams
+		language support
+	adhere to perl standards 
+		pod documentation
+		distribution
+		difficult to understand, fun to write
+	parallelize things and multiple computer support
+	cpu and memory optimizations
+	accept hardware/internet failures
+		restartable
+	reduce internet traffic
+		minimize requests
+		cache everything
+	other (from perlhack.pod)
+ 		1. Keep it fast, simple, and useful.
+		2. Keep features/concepts as orthogonal as possible.
+		3. No arbitrary limits (platforms, data sizes, cultures).
+		4. Keep it open and exciting to use/patch/advocate Perl everywhere.
+		5. Either assimilate new technologies, or build bridges to them.
+
+Problems (not bugs):
+
+	- It takes some time to start the program; not practical for small single file downloads.
+	- Command line only. It should have a graphical front-end; there exists a web front-end.
+	- Hard to install if you don't have Perl or have outdated Perl modules. It works fine
+	  with Perl 5.6 modules.
+	- slave mode uses "dump files", and doesn't delete them.
+
+To-do (long list):
+
+	Bugs/debug/testing:
+		- test: timeout changes after "slave"
+ 		- test: counting MAX_DOCS with retry
+ 		- test: base-dir, out-depth, site leakage
+		- test: authentication
+		- test: redirect 3xx
+			usar: www.ig.com.br ?
+		- test: makerel
+		- test: makerel with javascript/java
+		- test: cookies
+		- test: env_proxy
+
+		- finish "my_link"
+
+		- if makerel was used, does not restart download properly
+		due to Content-Type information being lost.
+
+		- store Content-Type
+		- better error handling on protocol error, for page links
+
+		- use name-lookup table to make up for links/redirects
+		- save mime-type on name-lookup table
+
+		- --proxy option, overriding env_proxy
+
+The LWP::Simple interface will call env_proxy() for you automatically.
+Applications that use the $ua->env_proxy() method will normally not use the
+$ua->proxy() and $ua->no_proxy() methods.
+
+		- should make backup when mirroring (option)
+
+		- on NT: "The system cannot find the file specified"
+		- lwp-rget "depth" is "0" when we use "1"
+
+		Could use a log-file (maybe dump-format? -- include mime-type) to solve these:
+		- makerel: can't reliably use rel'ed html as cache, 
+		because some links had invalid characters removed. 
+		Could use the backup file to solve that.
+		- makerel: will not reprocess cache for non-html files like .cgi, .pl
+
+		- makerel: make relative links to other sites should be an option
+		- makerel: should work on applets.
+
+		- perl "link" is copying instead of linking, even on linux
+		- 401 - auth required -- supply name:pass
+		- implement "If-Range:"
+		- put / / on exclude, etc if they don't have
+		- arrays for $LOOP,$SUBST; accept multiple URL
+		- Doesn't recreate unix links on "ftp". 
+		Should do that instead of duplicating files (same on http redirects).
+		- uses Accept:text/html to ask for an html listing of the directory when 
+		in "ftp" mode. This will have to be changed to "text/ftp-dir-listing" if
+		we implement unix links.
+		- install and test "https"
+		- accept --url=http://...
+		- accept --batch=...grx
+		- ignore/accept comments: <! a href="..."> - nested comments???
+		- http server to make distributed downloads across the internet
+		- use eval to avoid fatal errors; test for valid protocols
+		- rename "old" .grx._BUSY_ files to .grx (timeout = 1 day?)
+		  option: touch busy file to show activity
+		- don't ignore "File:" on dump-file
+		- unknown protocol is a fatal error
+		- change the retry loop to a "while"
+		- leitura da configuracao:
+		  (1) le opcoes da linha de comando (pode trocar o arquivo .ini), 
+		  (2) le configuracao .ini, 
+		  (3) le opcoes da linha de comando de novo (pode ser override .ini),
+		  (4) le download-list-file
+		  (5) le opcoes da linha de comando de novo (pode ser override download-list-file)
+		- execute/override download-list-file "File:"
+		  opcao: usar --subst=/k:\\temp/c:\\download/
+	Generalization, user-interface:
+		- arquivo de log opcional para guardar os headers. 
+		  Opcao: filename._HEADER_; --log-headers
+		- make it a Perl module (crawler, robot?), generic, re-usable 
+		- option to understand robot-rules
+		- make .glynx the default suffix for everything
+		- try to support <form> through download-list-file
+		- internal small javascript interpreter
+		- perl/tk front-end; finish web front end
+		- config comment-string in download-list-file
+		- config comment/uncomment for directives
+ 		- arquivo default para dump sem parametros - "dump-[host]-1"?
+		make backup on overwrite dump
+ 		- option portugues/english?
+		- plugins: for each chunk, page, link, new site, level change, dump file change, 
+	  	  max files, on errors, retry level change. Opcao: usar callbacks.
+		- dump suffix option
+		- javascript interpreter option
+		- scripting option (execute sequentially instead of parallel)
+		- use environment
+ 		- aceitar configuracao --nofollow="shtml" e --follow="xxx"
+ 		- controle de hora, bytes por segundo
+ 		- protocolo pnm: - realvideo, arquivos .rpm
+ 		- streams
+ 		- gnutella
+ 		- 401 Authentication Required, generalize abort-on-error list
+	Standards/perl:
+		- packing for distribution, include rfcs, etc?
+		- include web front-end in package?
+		- installation hints, package version problems (abs_url)
+ 		- make an object for link-lists - escolher e especializar um existente.
+ 		- check: 19.4.5 HTTP Header Fields in Multipart Body-Parts
+			Content-Encoding
+			Persistent connections: Connection-header
+			Accept: */*, *.*
+ 		- documentar melhor o uso de "\" em exclude e subst
+	Network/parallel support:		
+		- timed downloads - start/stop hours
+ 		- gravar arquivo "to-do" durante o processamento, 
+		para poder retomar em caso de interrupcao.
+   		ex: a cada 10 minutos
+ 		- Redo Web front-end
+	Speed optimizations:
+		- use an optional database connection
+		- Persistent connections;
+		- take a look at LWP::ParallelUserAgent
+		- take a look at LWPng for simultaneous file transfers
+		- take a look at LWP::Sitemapper
+		- use eval around things do speed up program loading
+ 		- opcao: pilhas diferentes dependendo do tipo de arquivo ou site, para acelerar a procura
+	Other:
+ 		- forms / PUT
+
+../perl/html/site/lib/lwpcook.html
+
+POST
+
+There is no simple procedural interface for posting data to a WWW server. You
+must use the object oriented interface for this. The most common POST
+operation is to access a WWW form application:
+
+  use LWP::UserAgent;
+  $ua = LWP::UserAgent->new;
+
+  my $req = HTTP::Request->new(POST => 'http://www.perl.com/cgi-bin/BugGlimpse');
+  $req->content_type('application/x-www-form-urlencoded');
+  $req->content('match=www&errors=0');
+
+  my $res = $ua->request($req);
+  print $res->as_string;
+
+Lazy people use the HTTP::Request::Common module to set up a suitable
+POST request message (it handles all the escaping issues) and has a suitable
+default for the content_type:
+
+  use HTTP::Request::Common qw(POST);
+  use LWP::UserAgent;
+  $ua = LWP::UserAgent->new;
+
+  my $req = POST 'http://www.perl.com/cgi-bin/BugGlimpse',
+                [ search => 'www', errors => 0 ];
+
+  print $ua->request($req)->as_string;
+
+The lwp-request program (alias POST) that is distributed with the library can
+also be used for posting data.
+
+ 		- Renomear a extensao de acordo com o mime-type (ou copiar para o outro nome).
+   		configuracao:	--on-redirect=rename 
+                	  	--on-redirect=copy
+                	  	--on-redirect=link
+				--on-mime=...
+ 		- tamanho maximo do arquivo recebido
+ 		- disco cheio / alternate dir
+ 		- "--proxy=http:"1.1.1.1",ftp:"1.1.1.1"
+  		  "--proxy="1.1.1.1"
+  		    acessar proxy: $ua->proxy(...) Set/retrieve proxy URL for a scheme: 
+  		    $ua->proxy(['http', 'ftp'], 'http://proxy.sn.no:8001/');
+  		    $ua->proxy('gopher', 'http://proxy.sn.no:8001/');
+		- accept empty "--dump" or "--nodump"
+		--backup / --nobackup
+			when mirroring, overwriting dump, reprocessing links.
+ 		--max-mb=100
+ 			limita o tamanho total do download
+ 		--nospace
+ 			permite links com espacos no nome (ver lwp-rget)
+ 		--include=".exe" --nofollow=".shtml" --follow=".htm"
+ 			opcoes de inclusao de arquivos (procurar links dentro)
+ 		--full ou --depth=full
+ 			opcao site inteiro
+ 		--chunk=128000
+		--dump-all
+			grava todos os links, incluindo os ja existentes e paginas processadas
+
+Other problems - design decisions to make
+
+ - se usar '' no eval nao precisa de \\ ?
+ - montar links usando java ?
+ - a biblioteca perl faz sozinha Redirection 3xx ?
+ - usar File::Path para criar diretorios ?
+ - are applets always ".class" ?
+ - usar: $ua->max_size([$bytes]) - nao funciona com callback
+ - criar arquivo PART com tamanho zero quando da erro 408 - timeout
+ - como e' o formato dump do go!zilla?
+
+------------------

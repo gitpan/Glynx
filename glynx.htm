@@ -16,7 +16,6 @@
 	<LI><A HREF="#HINTS">HINTS</A>
 	<LI><A HREF="#COMMAND_LINE_OPTIONS">COMMAND-LINE OPTIONS</A>
 	<LI><A HREF="#TO_DO">TO-DO</A>
-	<LI><A HREF="#README">README</A>
 	<LI><A HREF="#COPYRIGHT">COPYRIGHT</A>
 </UL>
 <!-- INDEX END -->
@@ -26,11 +25,6 @@
 <H1><A NAME="NAME">NAME</A></H1>
 <P>
 Glynx - a download manager. 
-
-<P>
-Download from <A
-HREF="http://www.ipct.pucrs.br/flavio/glynx/glynx-latest.pl">http://www.ipct.pucrs.br/flavio/glynx/glynx-latest.pl</A>
-
 
 <P>
 <HR>
@@ -43,21 +37,20 @@ It can be used to make download lists to be used with other download
 managers, making a distributed download process.
 
 <P>
-It currently supports resume, retry, referer, user-agent, java, frames,
+It currently supports resume/retry, referer, user-agent, frames,
 distributed download (see <CODE>--slave</CODE>, <CODE>--stop</CODE>, <CODE>--restart</CODE>).
 
 <P>
-It partially supports redirect, javascript, multimedia, authentication,
-mirror
+It partially supports: redirect (using file-copy), java, javascript,
+multimedia, authentication (only basic), mirror, translating links to local
+computer (<CODE>--makerel</CODE>), ftp, renaming too long filenames and too deep directories, cookies,
+proxy.
 
 <P>
-It does not support forms
+It does not support yet: forms
 
 <P>
-It has not been tested with ``https'' yet.
-
-<P>
-It should be better tested with ``ftp''. 
+No testing so far: ``https:''.
 
 <P>
 Tested on Linux and NT
@@ -92,7 +85,7 @@ Tested on Linux and NT
 <HR>
 <H1><A NAME="HINTS">HINTS</A></H1>
 <P>
-How to make a default configuration:
+How to create a default configuration:
 
 <P>
 <PRE>        Start the program with all command-line configurations, plus --cfg-save
@@ -198,33 +191,45 @@ This means you need to install at least ``openssl''
 <HR>
 <H1><A NAME="COMMAND_LINE_OPTIONS">COMMAND-LINE OPTIONS</A></H1>
 <P>
+Check --help for default values.
+
+<P>
 Very basic:
 
 <P>
-<PRE>  --version         Print version number ($VERSION) and quit
+<PRE>  --version         Print version number and quit
   --verbose         More output
   --quiet           No output
   --help            Help page
-  --cfg-save        Save configuration to file &quot;$CFG_FILE&quot;
-  --base-dir=DIR    Place to load/save files (default is &quot;$BASE_DIR&quot;)
+  --cfg-save        Save configuration to file
+  --base-dir=DIR    Place to load/save files
 </PRE>
 <P>
 Download options are:
 
 <P>
-<PRE>  --sleep=SECS      Sleep between gets, ie. go slowly (default is $SLEEP)
-  --prefix=PREFIX   Limit URLs to those which begin with PREFIX (default is URL base)
+<PRE>  --sleep=SECS      Sleep between gets, ie. go slowly
+  --prefix=PREFIX   Limit URLs to those which begin with PREFIX
                     Multiple &quot;--prefix&quot; are allowed.
-  --depth=N         Maximum depth to traverse (default is $DEPTH)
-  --out-depth=N     Maximum depth to traverse outside of PREFIX (default is $OUT_DEPTH)
-  --referer=URI     Set initial referer header (default is &quot;$REFERER&quot;)
-  --limit=N         A limit on the number documents to get (default is $MAX_DOCS)
-  --retry=N         Maximum number of retrys (default is $RETRY_MAX)
-  --timeout=SECS    Timeout value - increases on retrys (default is $TIMEOUT)
-  --agent=AGENT     User agent name (default is &quot;$AGENT&quot;)
-  --mirror          Checks all existing files for updates (default is --nomirror)
+  --depth=N         Maximum depth to traverse
+  --out-depth=N     Maximum depth to traverse outside of PREFIX
+  --referer=URI     Set initial referer header
+  --limit=N         A limit on the number documents to get
+  --retry=N         Maximum number of retrys
+  --timeout=SECS    Timeout value - increases on retrys
+  --agent=AGENT     User agent name
+  --mirror          Checks all existing files for updates
+  --nomirror        Do not check for updates -- if file exists, it's ok
   --mediaext        Creates a file link, guessing the media type extension (.jpg, .gif)
-                    (Windows perl makes a file copy) (default is --nomediaext)
+                    (perl actually makes a file copy)
+  --nomediaext      Do not try to change media type extension
+  --makerel         Make Relative links. Links in pages will work in the
+                    local computer.
+  --nomakerel       Keep links as they are. Do not try to change links.
+  --auth=USER:PASS  Set authentication credentials
+  --cookies=FILE    Set up a cookies file (default is no cookies)
+  --name-len-max    Limit filename size
+  --dir-depth-max   Limit directory depth
 </PRE>
 <P>
 Multi-process control:
@@ -239,8 +244,7 @@ Not implemented yet but won't generate fatal errors (compatibility with
 lwp-rget):
 
 <P>
-<PRE>  --auth=USER:PASS  Set authentication credentials for web site
-  --hier            Download into hierarchy (not all files into cwd)
+<PRE>  --hier            Download into hierarchy (not all files into cwd)
   --iis             Workaround IIS 2.0 bug by sending &quot;Accept: */*&quot; MIME
                     header; translates backslashes (\) to forward slashes (/)
   --keepext=type    Keep file extension for MIME types (comma-separated list)
@@ -251,17 +255,18 @@ lwp-rget):
 Other options: (to-be better explained)
 
 <P>
-<PRE>  --indexfile=FILE  Index file in a directory (default is &quot;$INDEXFILE&quot;)
-  --part-suffix=.SUFFIX (default is &quot;$PART_SUFFIX&quot;) (eg: &quot;.Getright&quot; &quot;.PART&quot;)
-  --dump=FILE       (default is &quot;$DUMP&quot;) make download-list file, 
-                    to be used later
-  --dump-max=N      (default is $DUMP_MAX) number of links per download-list file 
-  --invalid-char=C  (default is &quot;$INVALID_CHAR&quot;)
-  --exclude=/REGEXP/i (default is &quot;@EXCLUDE&quot;) Don't download matching URLs
+<PRE>  --indexfile=FILE  Index file in a directory
+  --part-suffix=.SUFFIX  Extension to use for partial downloads 
+                    (example: &quot;.Getright&quot; &quot;.PART&quot;)
+  --dump=FILE       make download-list file, to be used later
+  --dump-max=N      number of links per download-list file 
+  --invalid-char=C  Character to use in substitutions for invalid characters
+  --exclude=/REGEXP/i  Don't download matching URLs
                     Multiple --exclude are allowed
-  --loop=REGEXP:INITIAL..FINAL (default is &quot;$LOOP&quot;) (eg: xx:a,b,c  xx:'01'..'10')
-  --subst=s/REGEXP/VALUE/i (default is &quot;$show_subst&quot;) (obs: &quot;\&quot; deve ser escrito &quot;\\&quot;)
-  --404-retry       will retry on error 404 Not Found (default). 
+  --loop=REGEXP:INITIAL..FINAL  Expand a URL through substitutions 
+                    (example: xx:a,b,c  xx:'01'..'10')
+  --subst=s/REGEXP/VALUE/i  Substitute some string in the urls.
+  --404-retry       will retry on error 404 Not Found. 
   --no404-retry     creates an empty file on error 404 Not Found.
 </PRE>
 <P>
@@ -273,353 +278,6 @@ More command-line compatibility with lwp-rget
 <P>
 Graphical user interface
 
-<P>
-<HR>
-<H1><A NAME="README">README</A></H1>
-<P>
-Glynx - a download manager. 
-
-<P>
-Installation:
-
-<P>
-<PRE>    Windows:
-        - unzip to a directory, such as c:\glynx or even c:\temp
-        - this is a DOS script, it will not work properly if you double click it.
-        However, you can put it in the startup directory in &quot;slave mode&quot; 
-        making a link with the --slave parameter. Then open another DOS window
-        to operate it as a client. 
-        - the latest ActivePerl has all the modules needed, except for https.
-</PRE>
-<P>
-<PRE>    Unix/Linux:
-</PRE>
-<P>
-<PRE>        make a subdirectory and cd to it
-        tar -xzf Glynx-[version].tar.gz
-        chmod +x glynx.pl                 (if necessary)
-        pod2html glynx.pl -o=glynx.htm    (this is optional)
-</PRE>
-<P>
-<PRE>        - under RedHat 6.2 I had to upgrade or install these modules:
-        HTML::Tagset MIME:Base64 URI HTML::Parser Digest::MD5 libnet libwww-perl
-</PRE>
-<P>
-<PRE>        - to use https you will need:
-        openssl (www.openssl.org) Net::SSLeay IO::Socket::SSL
-</PRE>
-<P>
-<PRE>    Please note that the software will create many files in 
-    its work directory, so it is advisable to have a dedicated 
-    sub-directory for it.
-</PRE>
-<P>
-Goals:
-
-<P>
-<PRE>        generalize 
-                option to use (external) java and other script languages to extract links
-                configurable file names and suffixes
-                configurable dump file format
-                plugins
-                more protocols; download streams
-                language support
-        adhere to perl standards 
-                pod documentation
-                distribution
-                difficult to understand, fun to write
-        parallelize things and multiple computer support
-        cpu and memory optimizations
-        accept hardware/internet failures
-                restartable
-        reduce internet traffic
-                minimize requests
-                cache everything
-        other (from perlhack.pod)
-                1. Keep it fast, simple, and useful.
-                2. Keep features/concepts as orthogonal as possible.
-                3. No arbitrary limits (platforms, data sizes, cultures).
-                4. Keep it open and exciting to use/patch/advocate Perl everywhere.
-                5. Either assimilate new technologies, or build bridges to them.
-</PRE>
-<P>
-Problems (not bugs):
-
-<P>
-<PRE>        - It takes some time to start the program; not practical for small single file downloads.
-        - Command line only. It should have a graphical front-end; there exists a web front-end.
-        - Hard to install if you don't have Perl or have outdated Perl modules. It works fine
-          with Perl 5.6 modules.
-        - slave mode uses &quot;dump files&quot;, and doesn't delete them.
-</PRE>
-<P>
-To-do (long list):
-
-<P>
-<PRE>        Bugs/debug/testing:
-                - test: timeout changes after &quot;slave&quot;
-                - test: counting MAX_DOCS with retry
-                - test: base-dir, out-depth, site leakage
-                - test: authentication
-                - test: redirect 3xx
-                        usar: www.ig.com.br ?
-</PRE>
-<P>
-<PRE>                - perl &quot;link&quot; is copying instead of linking, even on linux
-                - 401 - auth required -- supply name:pass
-                - implement &quot;If-Range:&quot;
-                - put // on exclude, etc if they don't have
-                - arrays for $LOOP,$SUBST; accept multiple URL
-                - Doesn't recreate unix links on &quot;ftp&quot;. 
-                Should do that instead of duplicating files (same on http redirects).
-                - uses Accept:text/html to ask for an html listing of the directory when 
-                in &quot;ftp&quot; mode. This will have to be changed to &quot;text/ftp-dir-listing&quot; if
-                we implement unix links.
-                - install and test &quot;https&quot;
-                - accept --url=<A HREF="http://">http://</A>...
-                - accept --batch=...grx
-                - ignore/accept comments: &lt;! a href=&quot;...&quot;&gt; - nested comments???
-                - http server to make distributed downloads across the internet
-                - use eval to avoid fatal errors; test for valid protocols
-                - rename &quot;old&quot; .grx._BUSY_ files to .grx (timeout = 1 day?)
-                  option: touch busy file to show activity
-                - don't ignore &quot;<A HREF="File:&quot">File:&quot</A>; 
-                - unknown protocol is a fatal error
-                - change the retry loop to a &quot;while&quot;
-                - leitura da configuracao:
-                  (1) le opcoes da linha de comando (pode trocar o arquivo .ini), 
-                  (2) le configuracao .ini, 
-                  (3) le opcoes da linha de comando de novo (pode ser override .ini),
-                  (4) le download-list-file
-                  (5) le opcoes da linha de comando de novo (pode ser override download-list-file)
-                - execute/override download-list-file &quot;<A HREF="File:&quot">File:&quot</A>;
-                  opcao: usar --subst=/k:\\temp/c:\\download/
-        Generalization, user-interface:
-                - arquivo de log opcional para guardar os headers. 
-                  Opcao: filename._HEADER_; --log-headers
-                - make it a Perl module (crawler, robot?), generic, re-usable 
-                - option to understand robot-rules
-                - make .glynx the default suffix for everything
-                - try to support &lt;form&gt; through download-list-file
-                - internal small javascript interpreter
-                - perl/tk front-end; finish web front end
-                - config comment-string in download-list-file
-                - config comment/uncomment for directives
-                - arquivo default para dump sem parametros - &quot;dump-[n]-1&quot;?
-                - more configuration parameters
-                - opcao portugues/ingles?
-                - plugins: for each chunk, page, link, new site, level change, dump file change, 
-                  max files, on errors, retry level change. Opcao: usar callbacks.
-                - dump suffix option
-                - javascript interpreter option
-                - scripting option (execute sequentially instead of parallel)
-                - use environment
-                - aceitar configuracao --nofollow=&quot;shtml&quot; e --follow=&quot;xxx&quot;
-                - controle de hora, bytes por segundo
-                - protocolo pnm: - realvideo, arquivos .rpm
-                - streams
-                - gnutella
-                - 401 Authentication Required, generalize abort-on-error list, 
-                  support --auth= (see rget)
-                - opcao para reescrever paginas html com links relativos
-        Standards/perl:
-                - packaging for distribution, include rfcs, etc?
-                - include a default ini file in package
-                - include web front-end in package?
-                - installation hints, package version problems (abs_url)
-                - more english writing
-                - include all lwp-rget options, or ignore without exiting
-                - criar um objeto para as listas de links - escolher e especializar um existente.
-                - check: 19.4.5 HTTP Header Fields in Multipart Body-Parts
-                        Content-Encoding
-                        Persistent connections: Connection-header
-                        Accept: */*, *.*
-                - documentar melhor o uso de &quot;\&quot; em exclude e subst
-                - ler, enviar, configurar cookies
-        Network/parallel support:               
-                - timed downloads - start/stop hours
-                - gravar arquivo &quot;to-do&quot; durante o processamento, 
-                para poder retomar em caso de interrupcao.
-                ex: a cada 10 minutos
-                - Redo Web front-end
-        Speed optimizations:
-                - use an optional database connection
-                - Persistent connections;
-                - take a look at LWP::ParallelUserAgent
-                - take a look at LWPng for simultaneous file transfers
-                - take a look at LWP::Sitemapper
-                - use eval around things do speed up program loading
-                - opcao: pilhas diferentes dependendo do tipo de arquivo ou site, para acelerar a procura
-        Other:
-                - forms / PUT
-                - Renomear a extensao de acordo com o mime-type (ou copiar para o outro nome).
-                configuracao:   --on-redirect=rename 
-                                --on-redirect=copy
-                                --on-mime=rename
-                                --on-mime=copy
-                - configurar tamanho maximo da URL
-                - configurar profundidade maxima de subdiretorios
-                - tamanho maximo do arquivo recebido
-                - disco cheio / alternate dir
-                - &quot;--proxy=<A HREF="http:&quot">http:&quot</A>;1.1.1.1&quot;,<A HREF="ftp:&quot">ftp:&quot</A>;1.1.1.1&quot;
-                  &quot;--proxy=&quot;1.1.1.1&quot;
-                    acessar proxy: $ua-&gt;proxy(...) Set/retrieve proxy URL for a scheme: 
-                    $ua-&gt;proxy(['http', 'ftp'], '<A HREF="http://proxy.sn.no:8001/">http://proxy.sn.no:8001/</A>');
-                    $ua-&gt;proxy('gopher', '<A HREF="http://proxy.sn.no:8001/">http://proxy.sn.no:8001/</A>');
-                - enable &quot;--no-[option]&quot;
-                - accept empty &quot;--dump&quot; or &quot;--no-dump&quot; / &quot;--nodump&quot;
-                --max-mb=100
-                        limita o tamanho total do download
-                --auth=USER:PASS
-                        nao e' realmente necessario, pode estar dentro da URL
-                        existe no lwp-rget
-                --nospace
-                        permite links com espacos no nome (ver lwp-rget)
-                --relative-links
-                        opcao para refazer os links para relativo
-                --include=&quot;.exe&quot; --nofollow=&quot;.shtml&quot; --follow=&quot;.htm&quot;
-                        opcoes de inclusao de arquivos (procurar links dentro)
-                --full ou --depth=full
-                        opcao site inteiro
-                --chunk=128000
-                --dump-all
-                        grava todos os links, incluindo os ja existentes e paginas processadas
-</PRE>
-<P>
-Version history:
-
-<P>
-<PRE> 1.023:
-        - better redirect, but perl &quot;link&quot; is copying instead of linking
-        - --mirror option (304)
-        - --mediaext option
-        - sets file dates to last-modified
-</PRE>
-<P>
-<PRE> 1.022:
-        - multiple --prefix and --exclude seems to be working
-        - uses Accept:text/html to ask for an html listing of the directory when in &quot;ftp&quot; mode.
-        - corrected errors creating directory and copying file on linux
-</PRE>
-<P>
-<PRE> 1.021:
-        - uses URI::Heuristic on command-line URL
-        - shows error response headers (if verbose)
-        - look at the 3rd parameter on 206 (when available -- otherwise it gives 500),
-                        Content-Length: 637055          --&gt; if &quot;206&quot; this is &quot;chunk&quot; size
-                        Content-Range: bytes 1449076-2086130/2086131 --&gt; THIS is file size
-        - prefix of: <A HREF="http://rd.yahoo.com/footer/?http://travel.yahoo.com/">http://rd.yahoo.com/footer/?http://travel.yahoo.com/</A>
-          should be: <A HREF="http://rd.yahoo.com/footer/">http://rd.yahoo.com/footer/</A>
-        - included: &quot;wav&quot;
-        - sleep had 1 extra second
-        - sleep makes tests even when sleep==0
-</PRE>
-<P>
-<PRE> 1.020: oct-02-2000
-        - optimization: accepts 200, when expecting 206
-        - don't keep retrying when there is nothing to do
-        - 404 Not Found error sometimes means &quot;can't connect&quot; - uses &quot;--404-retry&quot;
-        - file read = binmode
-</PRE>
-<P>
-<PRE> 1.019: - restart if program was modified (-M $0)
-        - include &quot;mov&quot;
-        - stop, restart
-</PRE>
-<P>
-<PRE> 1.018: - better copy, rename and unlink
-        - corrected binary dump when slave
-        - comparacao de tamanho de arquivos corrigida
-        - span e' um comando de css, que funciona como &quot;a&quot; (a href == span href);
-          span class is not java
-</PRE>
-<P>
-<PRE> 1.017: - sleep prints dots if verbose.
-        - daemon mode (--slave)
-        - url and input file are optional
-</PRE>
-<P>
-<PRE> 1.016: sept-27-2000
-        - new name &quot;glynx.pl&quot;
-        - verbose/quiet
-        - exponential timeout on retry
-        - storage control is a bit more efficient
-        - you can filter the processing of a dump file using prefix, exclude, subst
-        - more things in english, lots of new &quot;to-do&quot;; &quot;goals&quot; section
-        - rename config file to glynx.ini
-</PRE>
-<P>
-<PRE> 1.015: - first published version, under name &quot;get.pl&quot;
-        - rotina unica de push/shift sem repeticao
-        - traduzido parcialmente para ingles, revisao das mensagens
-</PRE>
-<P>
-<PRE> 1.014: - verifica inside antes de incluir o link
-        - corrige numeracao dos arquivos dump
-        - header &quot;Location&quot;, &quot;Content-Base&quot;
-        - revisado &quot;Content-Location&quot;
-</PRE>
-<P>
-<PRE> 1.013: - para otimizar: retirar repeticoes dentro da pagina
-        - incluido &quot;png&quot;
-        - cria/testa arquivo &quot;not-found&quot;
-        - processa Content-Location - TESTAR - achar um site que use
-        - incluido tipo &quot;swf&quot;, &quot;dcr&quot; (shockwave) e &quot;css&quot; (style sheet)
-        - corrige <A HREF="http://host/../file">http://host/../file</A> gravado em ./host/../file =&gt; ./file
-        - retira caracteres estranhos vindos do javascript: ' ;
-        - os retrys pendentes sao gravados somente no final.
-        - (1) le opcoes, (2) le configuracao, (3) le opcoes de novo
-</PRE>
-<P>
-<PRE> 1.012: - segmenta o arquivo dump durante o processamento, permitindo iniciar o
-        download em paralelo a partir de outro processo/computador antes que a tarefa esteja
-        totalmente terminada
-        - utiliza indice para gravar o dump; nao destroi a lista que esta na memoria.
-        - salva a configuracao completa junto com o dump; 
-        - salva/le get.ini
-</PRE>
-<P>
-<PRE> 1.011: corrige autenticacao (prefix)
-        corrige dump
-        le dump
-        salva/le $OUT_DEPTH, depth (individual), prefix no arquivo dump
-</PRE>
-<P>
-<PRE> 1.010: resume
-        se o site nao tem resume, tenta de novo e escolhe o melhor resultado (ideia do Silvio)
-</PRE>
-<P>
-<PRE> 1.009: 404 not found nao enviado para o dump
-       processa arquivo se o tipo mime for text/html (nao funciona para o cache)
-       muda o referer dos links dependendo da base da resposta (redirect)
-       considera arquivos de tamanho zero como &quot;nao no cache&quot;
-       gera nome _INDEX_.HTM quando o final da URL tem &quot;/&quot;. 
-</PRE>
-<P>
-<PRE> 1.008: trabalha internamente com URL absolutas
-       corrige vazamento quando out-nivel=0
-</PRE>
-<P>
-<PRE> 1.007: segmenta o arquivo dump 
-       acelera a procura em @processed
-       corrige o nome do diretorio no arquivo dump
-</PRE>
-<P>
-Other problems - design decisions to make
-
-<P>
-<PRE> - se usar '' no eval nao precisa de \\ ?
- - paginas html redirecionadas devem receber um tag &lt;BASE&gt; no texto?
- - montar links usando java ?
- - a biblioteca perl faz sozinha Redirection 3xx ?
- - usar <A HREF="File::Path">File::Path</A> para criar diretorios ?
- - applets sempre tem .class no fim?
- - file names excessivamente longos - o que fazer?
- - usar: $ua-&gt;max_size([$bytes]) - nao funciona com callback
- - mudar o filename se a base da resposta e diferente?
- - criar arquivo PART com tamanho zero quando da erro 408 - timeout
- - como e' o formato dump do go!zilla?
-</PRE>
 <P>
 <HR>
 <H1><A NAME="COPYRIGHT">COPYRIGHT</A></H1>
